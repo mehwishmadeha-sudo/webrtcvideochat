@@ -354,34 +354,30 @@ async function switchCamera() {
 }
 
 function toggleLocalVideoFullscreen() {
-  if (isClutterFree) {
-    isLocalFullscreen = !isLocalFullscreen;
-    
-    if (isLocalFullscreen) {
-      localVideoHalf.classList.add('video-half--fullscreen');
-      if (isRemoteFullscreen) {
-        remoteVideoHalf.classList.remove('video-half--fullscreen');
-        isRemoteFullscreen = false;
-      }
-    } else {
-      localVideoHalf.classList.remove('video-half--fullscreen');
+  isLocalFullscreen = !isLocalFullscreen;
+  
+  if (isLocalFullscreen) {
+    localVideoHalf.classList.add('video-half--fullscreen');
+    if (isRemoteFullscreen) {
+      remoteVideoHalf.classList.remove('video-half--fullscreen');
+      isRemoteFullscreen = false;
     }
+  } else {
+    localVideoHalf.classList.remove('video-half--fullscreen');
   }
 }
 
 function toggleRemoteVideoFullscreen() {
-  if (isClutterFree) {
-    isRemoteFullscreen = !isRemoteFullscreen;
-    
-    if (isRemoteFullscreen) {
-      remoteVideoHalf.classList.add('video-half--fullscreen');
-      if (isLocalFullscreen) {
-        localVideoHalf.classList.remove('video-half--fullscreen');
-        isLocalFullscreen = false;
-      }
-    } else {
-      remoteVideoHalf.classList.remove('video-half--fullscreen');
+  isRemoteFullscreen = !isRemoteFullscreen;
+  
+  if (isRemoteFullscreen) {
+    remoteVideoHalf.classList.add('video-half--fullscreen');
+    if (isLocalFullscreen) {
+      localVideoHalf.classList.remove('video-half--fullscreen');
+      isLocalFullscreen = false;
     }
+  } else {
+    remoteVideoHalf.classList.remove('video-half--fullscreen');
   }
 }
 
@@ -410,6 +406,7 @@ function showSnackbar(message, actionText = null, actionCallback = null) {
   }
   
   snackbar.classList.add('show');
+  setTimeout(hideSnackbar, 3000);
 }
 
 function hideSnackbar() {
