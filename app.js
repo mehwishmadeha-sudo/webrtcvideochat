@@ -36,7 +36,6 @@ let currentCamera = 'user';
 let isConnected = false;
 let isClutterFree = false;
 let isBrowserFullscreen = false;
-let userRole = null; // 'caller' or 'answerer'
 
 // Check if large screen
 function isLargeScreen() {
@@ -66,122 +65,121 @@ async function initializeMedia() {
   }
 }
 
-// 3-STATE SIGNALING LOGIC
+// === INITIAL LOAD ===
+// read offer and answer from Firebase root
 async function startSignaling() {
-  console.log('Starting 3-state signaling...');
+  console.log('=== INITIAL LOAD ===');
+  console.log('read offer and answer from Firebase root');
   
-  // Check offer first
-  onValue(offerRef, async (snapshot) => {
-    const offer = snapshot.val();
-    
-    if (offer) {
-      console.log('STATE 1: Found offer - deleting and creating answer');
-      await remove(offerRef);
-      userRole = 'answerer';
-      await handleOffer(offer);
-    }
-  }, { onlyOnce: true });
+  // Read both offer and answer
+  const offerSnapshot = await new Promise(resolve => {
+    onValue(offerRef, resolve, { onlyOnce: true });
+  });
+  const answerSnapshot = await new Promise(resolve => {
+    onValue(answerRef, resolve, { onlyOnce: true });
+  });
   
-  // Check answer
-  onValue(answerRef, async (snapshot) => {
-    const answer = snapshot.val();
+  const offer = offerSnapshot.val();
+  const answer = answerSnapshot.val();
+  
+  // === SCENARIO 1: Nothing in Firebase ===
+  if (offer == null && answer == null) {
+    console.log('=== SCENARIO 1: Nothing in Firebase ===');
+    console.log('No offer or answer. I am the first peer.');
     
-    if (answer) {
-      console.log('STATE 2: Found answer - fetching and deleting');
-      await remove(answerRef);
-      if (userRole === 'caller') {
-        await handleAnswer(answer);
+    const myOffer = await createOffer();
+    await set(offerRef, { sdp: myOffer.sdp, type: myOffer.type });
+    console.log('set /offer = myOffer.sdp');
+    
+    console.log('listen for /answer:');
+    onValue(answerRef, async (snapshot) => {
+      const answerData = snapshot.val();
+      if (answerData) {
+        console.log('when answer arrives:');
+        await connectToPeer(answerData);
+        console.log('connectToPeer(answer.sdp)');
       }
-    }
-  }, { onlyOnce: true });
-  
-  // If nothing found, create offer
-  if (!userRole) {
-    console.log('STATE 3: Nothing found - creating offer');
-    userRole = 'caller';
-    await createOffer();
+    });
+  }
+  // === SCENARIO 2: Offer exists, Answer missing ===
+  else if (offer != null && answer == null) {
+    console.log('=== SCENARIO 2: Offer exists, Answer missing ===');
+    console.log('Offer exists but no answer. I am the second peer.');
+    
+    const myAnswer = await createAnswer(offer);
+    await set(answerRef, { sdp: myAnswer.sdp, type: myAnswer.type });
+    console.log('set /answer = myAnswer.sdp');
+    console.log('Done. Do NOT listen to Firebase anymore.');
+  }
+  // === SCENARIO 3: Offer and Answer both exist ===
+  else if (offer != null && answer != null) {
+    console.log('=== SCENARIO 3: Offer and Answer both exist ===');
+    console.log('Both offer and answer exist. Assuming stale session.');
+    
+    await remove(offerRef);
+    await remove(answerRef);
+    console.log('delete /offer');
+    console.log('delete /answer');
+    
+    console.log('Restart fresh (go back to Scenario 1)');
+    const myOffer = await createOffer();
+    await set(offerRef, { sdp: myOffer.sdp, type: myOffer.type });
+    console.log('set /offer = myOffer.sdp');
+    
+    console.log('listen for /answer:');
+    onValue(answerRef, async (snapshot) => {
+      const answerData = snapshot.val();
+      if (answerData) {
+        console.log('when answer arrives:');
+        await connectToPeer(answerData);
+        console.log('connectToPeer(answer.sdp)');
+      }
+    });
   }
 }
 
 // Create offer
 async function createOffer() {
-  try {
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    
-    if (peerConnection.iceGatheringState === 'complete') {
-      await uploadOffer();
-    } else {
-      peerConnection.addEventListener('icegatheringstatechange', async () => {
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  
+  // Wait for ICE gathering
+  if (peerConnection.iceGatheringState !== 'complete') {
+    await new Promise(resolve => {
+      peerConnection.addEventListener('icegatheringstatechange', () => {
         if (peerConnection.iceGatheringState === 'complete') {
-          await uploadOffer();
+          resolve();
         }
       });
-    }
-  } catch (error) {
-    console.error('Create offer error:', error);
+    });
   }
+  
+  return peerConnection.localDescription;
 }
 
-// Upload offer
-async function uploadOffer() {
-  try {
-    const offerData = {
-      type: peerConnection.localDescription.type,
-      sdp: peerConnection.localDescription.sdp
-    };
-    
-    await set(offerRef, offerData);
-    console.log('Offer uploaded');
-  } catch (error) {
-    console.error('Upload offer error:', error);
-  }
-}
-
-// Handle offer and create answer
-async function handleOffer(offer) {
-  try {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    
-    if (peerConnection.iceGatheringState === 'complete') {
-      await uploadAnswer();
-    } else {
-      peerConnection.addEventListener('icegatheringstatechange', async () => {
+// Create answer
+async function createAnswer(offer) {
+  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  
+  // Wait for ICE gathering
+  if (peerConnection.iceGatheringState !== 'complete') {
+    await new Promise(resolve => {
+      peerConnection.addEventListener('icegatheringstatechange', () => {
         if (peerConnection.iceGatheringState === 'complete') {
-          await uploadAnswer();
+          resolve();
         }
       });
-    }
-  } catch (error) {
-    console.error('Handle offer error:', error);
+    });
   }
+  
+  return peerConnection.localDescription;
 }
 
-// Upload answer
-async function uploadAnswer() {
-  try {
-    const answerData = {
-      type: peerConnection.localDescription.type,
-      sdp: peerConnection.localDescription.sdp
-    };
-    
-    await set(answerRef, answerData);
-    console.log('Answer uploaded');
-  } catch (error) {
-    console.error('Upload answer error:', error);
-  }
-}
-
-// Handle answer
-async function handleAnswer(answer) {
-  try {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-    console.log('Answer processed');
-  } catch (error) {
-    console.error('Handle answer error:', error);
-  }
+// Connect to peer
+async function connectToPeer(answer) {
+  await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
 }
 
 // WebRTC events
@@ -412,7 +410,6 @@ function showSnackbar(message, actionText = null, actionCallback = null) {
   }
   
   snackbar.classList.add('show');
-  setTimeout(hideSnackbar, 3000);
 }
 
 function hideSnackbar() {
@@ -463,16 +460,14 @@ document.addEventListener('keydown', (event) => {
 
 // Orientation change handler
 window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    if (isLocalFullscreen) {
-      localVideoHalf.classList.remove('video-half--fullscreen');
-      isLocalFullscreen = false;
-    }
-    if (isRemoteFullscreen) {
-      remoteVideoHalf.classList.remove('video-half--fullscreen');
-      isRemoteFullscreen = false;
-    }
-  }, 100);
+  if (isLocalFullscreen) {
+    localVideoHalf.classList.remove('video-half--fullscreen');
+    isLocalFullscreen = false;
+  }
+  if (isRemoteFullscreen) {
+    remoteVideoHalf.classList.remove('video-half--fullscreen');
+    isRemoteFullscreen = false;
+  }
 });
 
 // Prevent zoom on double tap
