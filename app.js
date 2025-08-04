@@ -1,7 +1,7 @@
 
 import { db, ref, onValue, set, remove } from './firebase-config.js';
 
-// Direct Firebase references - no rooms, no IDs
+// Firebase references
 const offerRef = ref(db, "offer");
 const answerRef = ref(db, "answer");
 
@@ -10,29 +10,23 @@ const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 const localVideoHalf = document.getElementById("localVideoHalf");
 const remoteVideoHalf = document.getElementById("remoteVideoHalf");
-
-// Control Elements
 const toggleMicBtn = document.getElementById("toggleMic");
 const toggleCamBtn = document.getElementById("toggleCam");
 const endCallBtn = document.getElementById("endCallBtn");
 const fullscreenBtn = document.getElementById("fullscreenBtn");
 const switchCameraBtn = document.getElementById("switchCamera");
-
-// Status Elements
 const snackbar = document.getElementById("snackbar");
 const snackbarText = document.getElementById("snackbarText");
 const snackbarAction = document.getElementById("snackbarAction");
-
-// Icons
 const micIcon = document.getElementById("micIcon");
 const camIcon = document.getElementById("camIcon");
 
-// WebRTC Configuration
+// WebRTC
 const peerConnection = new RTCPeerConnection({ 
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }] 
 });
 
-// State Management
+// State
 let localStream;
 let isMicEnabled = true;
 let isCamEnabled = true;
@@ -40,17 +34,16 @@ let isLocalFullscreen = false;
 let isRemoteFullscreen = false;
 let currentCamera = 'user';
 let isConnected = false;
-let hasProcessedSignaling = false;
-let userRole = null; // 'caller' or 'answerer'
 let isClutterFree = false;
 let isBrowserFullscreen = false;
+let userRole = null; // 'caller' or 'answerer'
 
-// Check if device is large screen (laptop/desktop)
+// Check if large screen
 function isLargeScreen() {
   return window.innerWidth >= 1024;
 }
 
-// Initialize Media
+// Initialize media
 async function initializeMedia() {
   try {
     const constraints = {
@@ -65,8 +58,7 @@ async function initializeMedia() {
       peerConnection.addTrack(track, localStream);
     });
 
-    // Start signaling immediately
-    setTimeout(startSignaling, 500);
+    startSignaling();
     
   } catch (error) {
     console.error('Media error:', error);
@@ -74,66 +66,49 @@ async function initializeMedia() {
   }
 }
 
-// Start signaling with simple state logic
+// 3-STATE SIGNALING LOGIC
 async function startSignaling() {
-  console.log('Starting signaling...');
+  console.log('Starting 3-state signaling...');
   
-  if (hasProcessedSignaling) return;
-  hasProcessedSignaling = true;
-  
-  // Check Firebase state and act accordingly
+  // Check offer first
   onValue(offerRef, async (snapshot) => {
     const offer = snapshot.val();
     
     if (offer) {
-      console.log('Found offer - deleting and creating answer');
-      // State 1: See OFFER → Delete offer → Create answer
+      console.log('STATE 1: Found offer - deleting and creating answer');
       await remove(offerRef);
       userRole = 'answerer';
-      await handleOfferAndCreateAnswer(offer);
+      await handleOffer(offer);
     }
   }, { onlyOnce: true });
   
+  // Check answer
   onValue(answerRef, async (snapshot) => {
     const answer = snapshot.val();
     
     if (answer) {
-      console.log('Found answer - fetching and deleting');
-      // State 2: See ANSWER → Fetch answer → Delete answer
+      console.log('STATE 2: Found answer - fetching and deleting');
       await remove(answerRef);
       if (userRole === 'caller') {
-        await processAnswer(answer);
+        await handleAnswer(answer);
       }
     }
   }, { onlyOnce: true });
   
-  // Small delay to check if anything exists, then create offer if nothing found
-  setTimeout(async () => {
-    // Check one more time if we should create an offer
-    const offerSnapshot = await new Promise(resolve => {
-      onValue(offerRef, resolve, { onlyOnce: true });
-    });
-    const answerSnapshot = await new Promise(resolve => {
-      onValue(answerRef, resolve, { onlyOnce: true });
-    });
-    
-    if (!offerSnapshot.val() && !answerSnapshot.val() && !userRole) {
-      console.log('Nothing found - creating offer');
-      // State 3: See NOTHING → Create offer
-      userRole = 'caller';
-      await createOffer();
-    }
-  }, 1000);
+  // If nothing found, create offer
+  if (!userRole) {
+    console.log('STATE 3: Nothing found - creating offer');
+    userRole = 'caller';
+    await createOffer();
+  }
 }
 
-// Create and upload offer
+// Create offer
 async function createOffer() {
   try {
-    console.log('Creating offer...');
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     
-    // Wait for ICE gathering
     if (peerConnection.iceGatheringState === 'complete') {
       await uploadOffer();
     } else {
@@ -148,33 +123,28 @@ async function createOffer() {
   }
 }
 
-// Upload offer to Firebase
+// Upload offer
 async function uploadOffer() {
   try {
-    const offerToUpload = {
+    const offerData = {
       type: peerConnection.localDescription.type,
       sdp: peerConnection.localDescription.sdp
     };
     
-    console.log('Uploading offer...');
-    await set(offerRef, offerToUpload);
-    console.log('Offer uploaded successfully');
-    
+    await set(offerRef, offerData);
+    console.log('Offer uploaded');
   } catch (error) {
     console.error('Upload offer error:', error);
   }
 }
 
 // Handle offer and create answer
-async function handleOfferAndCreateAnswer(offer) {
+async function handleOffer(offer) {
   try {
-    console.log('Processing offer and creating answer...');
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     
-    // Wait for ICE gathering
     if (peerConnection.iceGatheringState === 'complete') {
       await uploadAnswer();
     } else {
@@ -189,35 +159,32 @@ async function handleOfferAndCreateAnswer(offer) {
   }
 }
 
-// Upload answer to Firebase
+// Upload answer
 async function uploadAnswer() {
   try {
-    const answerToUpload = {
+    const answerData = {
       type: peerConnection.localDescription.type,
       sdp: peerConnection.localDescription.sdp
     };
     
-    console.log('Uploading answer...');
-    await set(answerRef, answerToUpload);
-    console.log('Answer uploaded successfully');
-    
+    await set(answerRef, answerData);
+    console.log('Answer uploaded');
   } catch (error) {
     console.error('Upload answer error:', error);
   }
 }
 
-// Process answer (for caller)
-async function processAnswer(answer) {
+// Handle answer
+async function handleAnswer(answer) {
   try {
-    console.log('Processing answer...');
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-    console.log('Answer processed successfully');
+    console.log('Answer processed');
   } catch (error) {
-    console.error('Error processing answer:', error);
+    console.error('Handle answer error:', error);
   }
 }
 
-// WebRTC Events
+// WebRTC events
 peerConnection.ontrack = (event) => {
   remoteVideo.srcObject = event.streams[0];
   console.log('Remote stream received');
@@ -230,15 +197,13 @@ peerConnection.onconnectionstatechange = () => {
   updateConnectionDot();
   
   if (isConnected) {
-    console.log('WebRTC connection established!');
+    console.log('Connected!');
   }
 };
 
 peerConnection.onicecandidate = (event) => {
   if (event.candidate) {
     console.log('ICE candidate:', event.candidate.type);
-  } else {
-    console.log('ICE gathering finished');
   }
 };
 
@@ -264,14 +229,13 @@ async function toggleClutterFree() {
   const fullscreenIcon = fullscreenBtn.querySelector('.material-symbols-outlined');
   
   if (isClutterFree) {
-    // On large screens, also enter browser fullscreen
+    // On large screens, enter browser fullscreen
     if (isLargeScreen() && !document.fullscreenElement) {
       try {
         await document.documentElement.requestFullscreen();
         isBrowserFullscreen = true;
-        console.log('Entered browser fullscreen');
       } catch (error) {
-        console.log('Browser fullscreen not supported or denied');
+        console.log('Browser fullscreen not supported');
       }
     }
     
@@ -286,22 +250,17 @@ async function toggleClutterFree() {
     }
     revertBtn.style.display = 'flex';
     
-    // Expand video halves to full screen
+    // Expand video halves
     videoApp.classList.add('clutter-free');
-    
-    // Update fullscreen icon to collapse icon
     fullscreenIcon.textContent = 'fullscreen_exit';
-    
-    console.log('Clutter-free mode enabled');
   } else {
-    // Exit browser fullscreen if we entered it
+    // Exit browser fullscreen
     if (isBrowserFullscreen && document.fullscreenElement) {
       try {
         await document.exitFullscreen();
         isBrowserFullscreen = false;
-        console.log('Exited browser fullscreen');
       } catch (error) {
-        console.log('Error exiting browser fullscreen');
+        console.log('Error exiting fullscreen');
       }
     }
     
@@ -317,7 +276,7 @@ async function toggleClutterFree() {
     // Restore normal layout
     videoApp.classList.remove('clutter-free');
     
-    // Reset any individual video fullscreens
+    // Reset video fullscreens
     if (isLocalFullscreen) {
       localVideoHalf.classList.remove('video-half--fullscreen');
       isLocalFullscreen = false;
@@ -327,26 +286,21 @@ async function toggleClutterFree() {
       isRemoteFullscreen = false;
     }
     
-    // Update fullscreen icon back to expand icon
     fullscreenIcon.textContent = 'fullscreen';
-    
-    console.log('Normal mode restored');
   }
 }
 
-// Create revert button with theme colors
+// Create revert button
 function createRevertButton() {
   const revertBtn = document.createElement('button');
   revertBtn.id = 'revertBtn';
   revertBtn.className = 'revert-button';
   revertBtn.innerHTML = '<span class="material-symbols-outlined">fullscreen_exit</span>';
-  revertBtn.setAttribute('aria-label', 'Exit fullscreen');
   revertBtn.onclick = toggleClutterFree;
-  
   document.body.appendChild(revertBtn);
 }
 
-// Control Functions
+// Control functions
 function toggleMicrophone() {
   if (!localStream) return;
   
@@ -402,95 +356,44 @@ async function switchCamera() {
 }
 
 function toggleLocalVideoFullscreen() {
-  console.log('toggleLocalVideoFullscreen called - isClutterFree:', isClutterFree, 'isLocalFullscreen:', isLocalFullscreen);
-  
-  // In clutter-free mode, clicking should make video fullscreen
   if (isClutterFree) {
     isLocalFullscreen = !isLocalFullscreen;
     
     if (isLocalFullscreen) {
       localVideoHalf.classList.add('video-half--fullscreen');
-      console.log('Added fullscreen class to local video');
-      // Hide remote video when local is fullscreen
       if (isRemoteFullscreen) {
         remoteVideoHalf.classList.remove('video-half--fullscreen');
         isRemoteFullscreen = false;
-        console.log('Removed fullscreen from remote video');
       }
     } else {
       localVideoHalf.classList.remove('video-half--fullscreen');
-      console.log('Removed fullscreen class from local video');
-    }
-  } else {
-    // Normal mode behavior (existing functionality)
-    isLocalFullscreen = !isLocalFullscreen;
-    
-    if (isLocalFullscreen) {
-      localVideoHalf.classList.add('video-half--fullscreen');
-      console.log('Added fullscreen class to local video (normal mode)');
-      if (isRemoteFullscreen) {
-        remoteVideoHalf.classList.remove('video-half--fullscreen');
-        isRemoteFullscreen = false;
-        console.log('Removed fullscreen from remote video (normal mode)');
-      }
-    } else {
-      localVideoHalf.classList.remove('video-half--fullscreen');
-      console.log('Removed fullscreen class from local video (normal mode)');
     }
   }
 }
 
 function toggleRemoteVideoFullscreen() {
-  console.log('toggleRemoteVideoFullscreen called - isClutterFree:', isClutterFree, 'isRemoteFullscreen:', isRemoteFullscreen);
-  
-  // In clutter-free mode, clicking should make video fullscreen
   if (isClutterFree) {
     isRemoteFullscreen = !isRemoteFullscreen;
     
     if (isRemoteFullscreen) {
       remoteVideoHalf.classList.add('video-half--fullscreen');
-      console.log('Added fullscreen class to remote video');
-      // Hide local video when remote is fullscreen
       if (isLocalFullscreen) {
         localVideoHalf.classList.remove('video-half--fullscreen');
         isLocalFullscreen = false;
-        console.log('Removed fullscreen from local video');
       }
     } else {
       remoteVideoHalf.classList.remove('video-half--fullscreen');
-      console.log('Removed fullscreen class from remote video');
-    }
-  } else {
-    // Normal mode behavior (existing functionality)
-    isRemoteFullscreen = !isRemoteFullscreen;
-    
-    if (isRemoteFullscreen) {
-      remoteVideoHalf.classList.add('video-half--fullscreen');
-      console.log('Added fullscreen class to remote video (normal mode)');
-      if (isLocalFullscreen) {
-        localVideoHalf.classList.remove('video-half--fullscreen');
-        isLocalFullscreen = false;
-        console.log('Removed fullscreen from local video (normal mode)');
-      }
-    } else {
-      remoteVideoHalf.classList.remove('video-half--fullscreen');
-      console.log('Removed fullscreen class from remote video (normal mode)');
     }
   }
 }
 
 function endCall() {
-  console.log('Ending call...');
-  
   peerConnection.close();
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
   }
-  
-  // Clean up Firebase
   remove(offerRef);
   remove(answerRef);
-  
   location.reload();
 }
 
@@ -516,36 +419,24 @@ function hideSnackbar() {
   snackbar.classList.remove('show');
 }
 
-// Handle browser fullscreen changes
+// Browser fullscreen change handler
 document.addEventListener('fullscreenchange', () => {
-  // If browser fullscreen was exited externally (ESC key), sync our state
   if (!document.fullscreenElement && isBrowserFullscreen) {
     isBrowserFullscreen = false;
-    // If we're in clutter-free mode, exit it too
     if (isClutterFree) {
       toggleClutterFree();
     }
   }
 });
 
-// Event Listeners
+// Event listeners
 toggleMicBtn.addEventListener('click', toggleMicrophone);
 toggleCamBtn.addEventListener('click', toggleCamera);
 endCallBtn.addEventListener('click', endCall);
-fullscreenBtn.addEventListener('click', toggleClutterFree); // Changed behavior
+fullscreenBtn.addEventListener('click', toggleClutterFree);
 switchCameraBtn.addEventListener('click', switchCamera);
-
-// Add debugging for video click events
-localVideoHalf.addEventListener('click', (e) => {
-  console.log('Local video clicked - Event:', e);
-  toggleLocalVideoFullscreen();
-});
-
-remoteVideoHalf.addEventListener('click', (e) => {
-  console.log('Remote video clicked - Event:', e);
-  toggleRemoteVideoFullscreen();
-});
-
+localVideoHalf.addEventListener('click', toggleLocalVideoFullscreen);
+remoteVideoHalf.addEventListener('click', toggleRemoteVideoFullscreen);
 snackbarAction.addEventListener('click', hideSnackbar);
 
 // Keyboard shortcuts
@@ -555,24 +446,22 @@ document.addEventListener('keydown', (event) => {
   switch (event.key.toLowerCase()) {
     case 'm': event.preventDefault(); toggleMicrophone(); break;
     case 'v': event.preventDefault(); toggleCamera(); break;
-    case 'f': event.preventDefault(); toggleClutterFree(); break; // Changed behavior
+    case 'f': event.preventDefault(); toggleClutterFree(); break;
     case 'c': event.preventDefault(); switchCamera(); break;
     case '1': event.preventDefault(); toggleLocalVideoFullscreen(); break;
     case '2': event.preventDefault(); toggleRemoteVideoFullscreen(); break;
     case 'escape':
       if (isLocalFullscreen || isRemoteFullscreen) {
-        // Exit individual video fullscreen first
         if (isLocalFullscreen) toggleLocalVideoFullscreen();
         if (isRemoteFullscreen) toggleRemoteVideoFullscreen();
       } else if (isClutterFree) {
-        // Then exit clutter-free mode
         toggleClutterFree();
       }
       break;
   }
 });
 
-// Handle orientation changes
+// Orientation change handler
 window.addEventListener('orientationchange', () => {
   setTimeout(() => {
     if (isLocalFullscreen) {
@@ -587,13 +476,8 @@ window.addEventListener('orientationchange', () => {
 });
 
 // Prevent zoom on double tap
-let lastTouchEnd = 0;
 document.addEventListener('touchend', (event) => {
-  const now = (new Date()).getTime();
-  if (now - lastTouchEnd <= 300) {
-    event.preventDefault();
-  }
-  lastTouchEnd = now;
+  event.preventDefault();
 }, false);
 
 // Initialize
