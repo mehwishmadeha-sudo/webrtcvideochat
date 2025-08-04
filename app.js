@@ -5,14 +5,6 @@ import { db, ref, onValue, set, remove } from './firebase-config.js';
 const offerRef = ref(db, "offer");
 const answerRef = ref(db, "answer");
 
-// Generate unique session ID for this browser session
-const sessionId = 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-console.log('Session ID:', sessionId);
-
-// Configuration
-const OFFER_EXPIRY_TIME = 30000; // 30 seconds
-const CONNECTION_TIMEOUT = 15000; // 15 seconds
-
 // DOM Elements
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
@@ -48,47 +40,14 @@ let isLocalFullscreen = false;
 let isRemoteFullscreen = false;
 let currentCamera = 'user';
 let isConnected = false;
-let hasProcessedOffer = false;
+let hasProcessedSignaling = false;
 let userRole = null; // 'caller' or 'answerer'
-let isClutterFree = false; // New state for clutter-free mode
-let isBrowserFullscreen = false; // Track browser fullscreen state
-let connectionTimeout = null; // Track connection timeout
+let isClutterFree = false;
+let isBrowserFullscreen = false;
 
 // Check if device is large screen (laptop/desktop)
 function isLargeScreen() {
   return window.innerWidth >= 1024;
-}
-
-// Check if offer is expired
-function isOfferExpired(offerData) {
-  if (!offerData || !offerData.timestamp) {
-    return true; // No timestamp = expired
-  }
-  
-  const now = Date.now();
-  const offerAge = now - offerData.timestamp;
-  
-  console.log('Offer age:', offerAge, 'ms, expires at:', OFFER_EXPIRY_TIME, 'ms');
-  return offerAge > OFFER_EXPIRY_TIME;
-}
-
-// Check if this is our own offer/answer
-function isOwnData(data) {
-  return data && data.sessionId === sessionId;
-}
-
-// Clean up expired or stale data
-async function cleanupStaleData() {
-  console.log('Cleaning up stale data...');
-  
-  try {
-    // Clean up any existing data to start fresh
-    await remove(offerRef);
-    await remove(answerRef);
-    console.log('Cleaned up stale data successfully');
-  } catch (error) {
-    console.error('Error cleaning up stale data:', error);
-  }
 }
 
 // Initialize Media
@@ -106,9 +65,8 @@ async function initializeMedia() {
       peerConnection.addTrack(track, localStream);
     });
 
-    // Clean up stale data first, then start signaling
-    await cleanupStaleData();
-    setTimeout(startSignaling, 1000); // Give Firebase time to clean up
+    // Start signaling immediately
+    setTimeout(startSignaling, 500);
     
   } catch (error) {
     console.error('Media error:', error);
@@ -116,108 +74,56 @@ async function initializeMedia() {
   }
 }
 
-// Start signaling process
+// Start signaling with simple state logic
 async function startSignaling() {
   console.log('Starting signaling...');
   
-  // Set connection timeout
-  connectionTimeout = setTimeout(() => {
-    if (!isConnected) {
-      console.log('Connection timeout - cleaning up and restarting');
-      cleanupAndRestart();
-    }
-  }, CONNECTION_TIMEOUT);
+  if (hasProcessedSignaling) return;
+  hasProcessedSignaling = true;
   
-  // First check what's in Firebase
+  // Check Firebase state and act accordingly
   onValue(offerRef, async (snapshot) => {
-    const offerData = snapshot.val();
-    console.log('Offer check result:', offerData ? 'OFFER EXISTS' : 'NO OFFER');
+    const offer = snapshot.val();
     
-    if (offerData && !hasProcessedOffer) {
-      // Check if offer is expired
-      if (isOfferExpired(offerData)) {
-        console.log('Found expired offer, cleaning up and becoming caller');
-        await remove(offerRef);
-        await remove(answerRef);
-        userRole = 'caller';
-        hasProcessedOffer = true;
-        await createOffer();
-        return;
-      }
-      
-      // Check if this is our own offer
-      if (isOwnData(offerData)) {
-        console.log('Found own offer, ignoring and waiting for answerer');
-        return;
-      }
-      
-      // Valid offer from someone else, become answerer
-      console.log('Found valid offer from another user, becoming answerer');
+    if (offer) {
+      console.log('Found offer - deleting and creating answer');
+      // State 1: See OFFER → Delete offer → Create answer
+      await remove(offerRef);
       userRole = 'answerer';
-      hasProcessedOffer = true;
-      await handleOffer(offerData);
-    } else if (!offerData && !hasProcessedOffer) {
-      // No offer, become caller
-      console.log('No offer found, becoming caller');
-      userRole = 'caller';
-      hasProcessedOffer = true;
-      await createOffer();
+      await handleOfferAndCreateAnswer(offer);
     }
   }, { onlyOnce: true });
-
-  // Listen for answer (only if we're the caller)
+  
   onValue(answerRef, async (snapshot) => {
-    const answerData = snapshot.val();
-    if (answerData && userRole === 'caller') {
-      // Check if this is our own answer (shouldn't happen, but safety check)
-      if (isOwnData(answerData)) {
-        console.log('Detected own answer, ignoring');
-        return;
+    const answer = snapshot.val();
+    
+    if (answer) {
+      console.log('Found answer - fetching and deleting');
+      // State 2: See ANSWER → Fetch answer → Delete answer
+      await remove(answerRef);
+      if (userRole === 'caller') {
+        await processAnswer(answer);
       }
-      
-      console.log('Answer received by caller, processing...');
-      try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription({
-          type: answerData.type,
-          sdp: answerData.sdp
-        }));
-        console.log('Answer processed successfully by caller');
-        
-        // Clear timeout since we're progressing
-        if (connectionTimeout) {
-          clearTimeout(connectionTimeout);
-          connectionTimeout = null;
-        }
-        
-      } catch (error) {
-        console.error('Error processing answer:', error);
-        cleanupAndRestart();
-      }
-    } else if (answerData && userRole === 'answerer') {
-      console.log('Answer detected by answerer (ignoring own answer)');
     }
-  });
-}
-
-// Clean up and restart signaling
-async function cleanupAndRestart() {
-  console.log('Cleaning up and restarting signaling process...');
+  }, { onlyOnce: true });
   
-  // Clear timeout
-  if (connectionTimeout) {
-    clearTimeout(connectionTimeout);
-    connectionTimeout = null;
-  }
-  
-  // Reset state
-  hasProcessedOffer = false;
-  userRole = null;
-  
-  // Clean up Firebase
-  await cleanupStaleData();
-  
-  // Restart after a brief delay
-  setTimeout(startSignaling, 2000);
+  // Small delay to check if anything exists, then create offer if nothing found
+  setTimeout(async () => {
+    // Check one more time if we should create an offer
+    const offerSnapshot = await new Promise(resolve => {
+      onValue(offerRef, resolve, { onlyOnce: true });
+    });
+    const answerSnapshot = await new Promise(resolve => {
+      onValue(answerRef, resolve, { onlyOnce: true });
+    });
+    
+    if (!offerSnapshot.val() && !answerSnapshot.val() && !userRole) {
+      console.log('Nothing found - creating offer');
+      // State 3: See NOTHING → Create offer
+      userRole = 'caller';
+      await createOffer();
+    }
+  }, 1000);
 }
 
 // Create and upload offer
@@ -226,16 +132,12 @@ async function createOffer() {
     console.log('Creating offer...');
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    console.log('Local description set:', offer.type);
     
-    // Wait for ICE gathering to complete
+    // Wait for ICE gathering
     if (peerConnection.iceGatheringState === 'complete') {
-      console.log('ICE already complete, uploading now');
       await uploadOffer();
     } else {
-      console.log('Waiting for ICE gathering...');
       peerConnection.addEventListener('icegatheringstatechange', async () => {
-        console.log('ICE state changed to:', peerConnection.iceGatheringState);
         if (peerConnection.iceGatheringState === 'complete') {
           await uploadOffer();
         }
@@ -246,18 +148,15 @@ async function createOffer() {
   }
 }
 
-// Upload offer to Firebase with timestamp and session ID
+// Upload offer to Firebase
 async function uploadOffer() {
   try {
     const offerToUpload = {
       type: peerConnection.localDescription.type,
-      sdp: peerConnection.localDescription.sdp,
-      timestamp: Date.now(),
-      sessionId: sessionId
+      sdp: peerConnection.localDescription.sdp
     };
     
-    console.log('Uploading offer with session ID:', sessionId);
-    
+    console.log('Uploading offer...');
     await set(offerRef, offerToUpload);
     console.log('Offer uploaded successfully');
     
@@ -267,27 +166,19 @@ async function uploadOffer() {
 }
 
 // Handle offer and create answer
-async function handleOffer(offerData) {
+async function handleOfferAndCreateAnswer(offer) {
   try {
-    console.log('Processing incoming offer...');
-    await peerConnection.setRemoteDescription(new RTCSessionDescription({
-      type: offerData.type,
-      sdp: offerData.sdp
-    }));
-    console.log('Remote description set');
+    console.log('Processing offer and creating answer...');
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    console.log('Answer created:', answer.type);
     
-    // Wait for ICE gathering to complete
+    // Wait for ICE gathering
     if (peerConnection.iceGatheringState === 'complete') {
-      console.log('ICE already complete, uploading answer now');
       await uploadAnswer();
     } else {
-      console.log('Waiting for ICE gathering for answer...');
       peerConnection.addEventListener('icegatheringstatechange', async () => {
-        console.log('ICE state changed to:', peerConnection.iceGatheringState);
         if (peerConnection.iceGatheringState === 'complete') {
           await uploadAnswer();
         }
@@ -298,23 +189,31 @@ async function handleOffer(offerData) {
   }
 }
 
-// Upload answer to Firebase with session ID
+// Upload answer to Firebase
 async function uploadAnswer() {
   try {
     const answerToUpload = {
       type: peerConnection.localDescription.type,
-      sdp: peerConnection.localDescription.sdp,
-      timestamp: Date.now(),
-      sessionId: sessionId
+      sdp: peerConnection.localDescription.sdp
     };
     
-    console.log('Uploading answer with session ID:', sessionId);
-    
+    console.log('Uploading answer...');
     await set(answerRef, answerToUpload);
     console.log('Answer uploaded successfully');
     
   } catch (error) {
     console.error('Upload answer error:', error);
+  }
+}
+
+// Process answer (for caller)
+async function processAnswer(answer) {
+  try {
+    console.log('Processing answer...');
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    console.log('Answer processed successfully');
+  } catch (error) {
+    console.error('Error processing answer:', error);
   }
 }
 
@@ -332,23 +231,6 @@ peerConnection.onconnectionstatechange = () => {
   
   if (isConnected) {
     console.log('WebRTC connection established!');
-    
-    // Clear connection timeout
-    if (connectionTimeout) {
-      clearTimeout(connectionTimeout);
-      connectionTimeout = null;
-    }
-    
-    // Clean up Firebase data after successful connection
-    setTimeout(async () => {
-      console.log('Cleaning up Firebase data after successful connection...');
-      await remove(offerRef);
-      await remove(answerRef);
-      console.log('Firebase data cleaned');
-    }, 2000);
-  } else if (state === 'failed' || state === 'disconnected') {
-    console.log('Connection failed or disconnected, cleaning up...');
-    cleanupAndRestart();
   }
 };
 
@@ -598,18 +480,9 @@ function toggleRemoteVideoFullscreen() {
 }
 
 function endCall() {
-  console.log('Ending call and cleaning up...');
+  console.log('Ending call...');
   
-  // Clear connection timeout
-  if (connectionTimeout) {
-    clearTimeout(connectionTimeout);
-    connectionTimeout = null;
-  }
-  
-  // Close peer connection
   peerConnection.close();
-  
-  // Stop local stream
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
   }
@@ -618,12 +491,6 @@ function endCall() {
   remove(offerRef);
   remove(answerRef);
   
-  // Reset state
-  isConnected = false;
-  hasProcessedOffer = false;
-  userRole = null;
-  
-  // Reload page for fresh start
   location.reload();
 }
 
