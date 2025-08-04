@@ -91,6 +91,8 @@ body {
   cursor: pointer;
   transition: all var(--md-duration-medium) var(--md-easing);
   overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(103, 80, 164, 0.1);
 }
 
 /* Mobile Portrait: Top/Bottom Split */
@@ -258,6 +260,8 @@ body {
   transition: all var(--md-duration-short) var(--md-easing);
   position: relative;
   overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(103, 80, 164, 0.2);
 }
 
 .control-btn--standard {
@@ -322,6 +326,8 @@ body {
   box-shadow: var(--md-elevation-2);
   z-index: 1002;
   transition: all var(--md-duration-short) var(--md-easing);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(103, 80, 164, 0.2);
 }
 
 .revert-button:hover {

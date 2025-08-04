@@ -294,7 +294,10 @@ function createRevertButton() {
   revertBtn.id = 'revertBtn';
   revertBtn.className = 'revert-button';
   revertBtn.innerHTML = '<span class="material-symbols-outlined">fullscreen_exit</span>';
-  revertBtn.onclick = toggleClutterFree;
+  
+  // Add mobile-friendly event listeners
+  addMobileEventListener(revertBtn, toggleClutterFree);
+  
   document.body.appendChild(revertBtn);
 }
 
@@ -423,15 +426,24 @@ document.addEventListener('fullscreenchange', () => {
   }
 });
 
-// Event listeners
-toggleMicBtn.addEventListener('click', toggleMicrophone);
-toggleCamBtn.addEventListener('click', toggleCamera);
-endCallBtn.addEventListener('click', endCall);
-fullscreenBtn.addEventListener('click', toggleClutterFree);
-switchCameraBtn.addEventListener('click', switchCamera);
-localVideoHalf.addEventListener('click', toggleLocalVideoFullscreen);
-remoteVideoHalf.addEventListener('click', toggleRemoteVideoFullscreen);
-snackbarAction.addEventListener('click', hideSnackbar);
+// Event listeners - Add both click and touch events for mobile compatibility
+function addMobileEventListener(element, handler) {
+  element.addEventListener('click', handler);
+  element.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handler();
+  });
+}
+
+addMobileEventListener(toggleMicBtn, toggleMicrophone);
+addMobileEventListener(toggleCamBtn, toggleCamera);
+addMobileEventListener(endCallBtn, endCall);
+addMobileEventListener(fullscreenBtn, toggleClutterFree);
+addMobileEventListener(switchCameraBtn, switchCamera);
+addMobileEventListener(localVideoHalf, toggleLocalVideoFullscreen);
+addMobileEventListener(remoteVideoHalf, toggleRemoteVideoFullscreen);
+addMobileEventListener(snackbarAction, hideSnackbar);
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (event) => {
@@ -467,9 +479,18 @@ window.addEventListener('orientationchange', () => {
   }
 });
 
-// Prevent zoom on double tap
+// Prevent zoom on double tap (but allow button interactions)
+let lastTouchEnd = 0;
 document.addEventListener('touchend', (event) => {
-  event.preventDefault();
+  const now = Date.now();
+  
+  // Only prevent default for video elements to avoid zoom
+  if (event.target.closest('.video-half') || event.target.classList.contains('video-element')) {
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }
 }, false);
 
 // Initialize
