@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Video Call</title>
+  
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css" />
+  <script type="module" defer src="firebase-config.js"></script>
+  <script type="module" defer src="app.js"></script>
+</head>
+<body>
+  <!-- Main Video Container -->
+  <main class="video-app">
+    <!-- Remote Video (Top Half / Left Half) -->
+    <div class="video-half video-half--remote" id="remoteVideoHalf">
+      <video id="remoteVideo" autoplay playsinline class="video-element"></video>
+      <div class="video-label">
+        <span class="material-symbols-outlined">person</span>
+        <span>Remote</span>
+      </div>
+    </div>
+
+    <!-- Local Video (Bottom Half / Right Half) -->
+    <div class="video-half video-half--local" id="localVideoHalf">
+      <video id="localVideo" autoplay muted playsinline class="video-element"></video>
+      <div class="video-label">
+        <span class="material-symbols-outlined">person</span>
+        <span>You</span>
+      </div>
+    </div>
+
+    <!-- Bottom Control Bar -->
+    <div class="control-bar">
+      <!-- Connection Status Dot -->
+      <div class="connection-dot disconnected" id="connectionDot"></div>
+      
+      <button class="control-btn control-btn--standard" id="switchCamera" aria-label="Switch camera">
+        <span class="material-symbols-outlined">cameraswitch</span>
+      </button>
+      
+      <button class="control-btn control-btn--primary" id="toggleMic" aria-label="Toggle microphone">
+        <span class="material-symbols-outlined" id="micIcon">mic</span>
+      </button>
+      
+      <button class="control-btn control-btn--primary" id="toggleCam" aria-label="Toggle camera">
+        <span class="material-symbols-outlined" id="camIcon">videocam</span>
+      </button>
+      
+      <button class="control-btn control-btn--error" id="endCallBtn" aria-label="End call">
+        <span class="material-symbols-outlined">call_end</span>
+      </button>
+      
+      <button class="control-btn control-btn--standard" id="fullscreenBtn" aria-label="Toggle fullscreen">
+        <span class="material-symbols-outlined">fullscreen</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- Snackbar -->
+  <div class="snackbar" id="snackbar">
+    <span class="snackbar-text" id="snackbarText"></span>
+    <button class="snackbar-action" id="snackbarAction">Dismiss</button>
+  </div>
+</body>
+</html>
