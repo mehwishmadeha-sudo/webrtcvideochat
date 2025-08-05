@@ -10,6 +10,7 @@ A modern, minimal video calling web application built with WebRTC and Material 3
 - **🔥 Firebase Signaling**: Real-time signaling via Firebase Realtime Database
 - **🎛️ Intuitive Controls**: Mic, camera, fullscreen, and camera switching
 - **📺 Dual View Modes**: Split-screen and individual fullscreen views
+- **🔄 Aspect Ratio Control**: Toggle between fit (preserve aspect ratio) and fill (crop to fill) modes
 - **🖥️ Clutter-Free Mode**: Hide controls for immersive experience
 - **⌨️ Keyboard Shortcuts**: Quick access to all functions
 
@@ -31,6 +32,7 @@ Visit: [Your GitHub Pages URL will be here]
 - `V` - Toggle camera
 - `F` - Toggle clutter-free mode
 - `C` - Switch camera (mobile)
+- `Z` - Toggle video view mode (fit/fill)
 - `1` - Toggle local video fullscreen
 - `2` - Toggle remote video fullscreen
 - `ESC` - Exit fullscreen modes

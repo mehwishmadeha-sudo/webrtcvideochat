@@ -20,6 +20,8 @@ const snackbarText = document.getElementById("snackbarText");
 const snackbarAction = document.getElementById("snackbarAction");
 const micIcon = document.getElementById("micIcon");
 const camIcon = document.getElementById("camIcon");
+const toggleViewModeBtn = document.getElementById("toggleViewMode");
+const viewModeIcon = document.getElementById("viewModeIcon");
 
 // WebRTC
 const peerConnection = new RTCPeerConnection({ 
@@ -36,6 +38,7 @@ let currentCamera = 'user';
 let isConnected = false;
 let isClutterFree = false;
 let isBrowserFullscreen = false;
+let isVideoFitMode = true; // true = contain (fit), false = cover (fill)
 
 // Check if large screen
 function isLargeScreen() {
@@ -52,6 +55,9 @@ async function initializeMedia() {
 
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
     localVideo.srcObject = localStream;
+    
+    // Initialize video with fit mode (aspect ratio preserving)
+    localVideo.classList.add('fit-mode');
     
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
@@ -185,6 +191,8 @@ async function connectToPeer(answer) {
 // WebRTC events
 peerConnection.ontrack = (event) => {
   remoteVideo.srcObject = event.streams[0];
+  // Initialize remote video with fit mode (aspect ratio preserving)
+  remoteVideo.classList.add('fit-mode');
   console.log('Remote stream received');
 };
 
@@ -351,6 +359,15 @@ async function switchCamera() {
     localStream.addTrack(newVideoTrack);
     localVideo.srcObject = localStream;
     
+    // Maintain current video mode after camera switch
+    if (isVideoFitMode) {
+      localVideo.classList.add('fit-mode');
+      localVideo.classList.remove('fill-mode');
+    } else {
+      localVideo.classList.add('fill-mode');
+      localVideo.classList.remove('fit-mode');
+    }
+    
   } catch (error) {
     console.error('Camera switch failed:', error);
   }
@@ -381,6 +398,31 @@ function toggleRemoteVideoFullscreen() {
     }
   } else {
     remoteVideoHalf.classList.remove('video-half--fullscreen');
+  }
+}
+
+function toggleVideoViewMode() {
+  isVideoFitMode = !isVideoFitMode;
+  
+  // Update both video elements
+  const videos = [localVideo, remoteVideo];
+  videos.forEach(video => {
+    if (isVideoFitMode) {
+      video.classList.remove('fill-mode');
+      video.classList.add('fit-mode');
+    } else {
+      video.classList.remove('fit-mode');
+      video.classList.add('fill-mode');
+    }
+  });
+  
+  // Update button icon and show feedback
+  if (isVideoFitMode) {
+    viewModeIcon.textContent = 'fit_screen'; // Shows fit mode is active
+    showSnackbar('Fit mode: Full video visible with letterboxing');
+  } else {
+    viewModeIcon.textContent = 'crop_free'; // Shows fill mode is active
+    showSnackbar('Fill mode: Video cropped to fill screen');
   }
 }
 
@@ -426,14 +468,56 @@ document.addEventListener('fullscreenchange', () => {
   }
 });
 
-// Event listeners - Add both click and touch events for mobile compatibility
+// Event listeners - Universal touch/click handling
 function addMobileEventListener(element, handler) {
-  element.addEventListener('click', handler);
-  element.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handler();
-  });
+  let isPointerDown = false;
+  let startTarget = null;
+  
+  // Use pointer events for better cross-device support
+  if ('PointerEvent' in window) {
+    element.addEventListener('pointerdown', (e) => {
+      isPointerDown = true;
+      startTarget = e.target;
+      e.stopPropagation();
+    });
+    
+    element.addEventListener('pointerup', (e) => {
+      if (isPointerDown && startTarget === e.target) {
+        isPointerDown = false;
+        e.preventDefault();
+        e.stopPropagation();
+        handler();
+      }
+      isPointerDown = false;
+    });
+  } else {
+    // Fallback for older browsers
+    let touchStarted = false;
+    
+    element.addEventListener('touchstart', (e) => {
+      touchStarted = true;
+      startTarget = e.target;
+      e.stopPropagation();
+    }, { passive: true });
+    
+    element.addEventListener('touchend', (e) => {
+      if (touchStarted && startTarget === e.target) {
+        touchStarted = false;
+        e.preventDefault();
+        e.stopPropagation();
+        handler();
+      }
+      touchStarted = false;
+    });
+    
+    // Click for desktop
+    element.addEventListener('click', (e) => {
+      if (!touchStarted) {
+        e.stopPropagation();
+        handler();
+      }
+    });
+  }
 }
 
 addMobileEventListener(toggleMicBtn, toggleMicrophone);
@@ -441,6 +525,7 @@ addMobileEventListener(toggleCamBtn, toggleCamera);
 addMobileEventListener(endCallBtn, endCall);
 addMobileEventListener(fullscreenBtn, toggleClutterFree);
 addMobileEventListener(switchCameraBtn, switchCamera);
+addMobileEventListener(toggleViewModeBtn, toggleVideoViewMode);
 addMobileEventListener(localVideoHalf, toggleLocalVideoFullscreen);
 addMobileEventListener(remoteVideoHalf, toggleRemoteVideoFullscreen);
 addMobileEventListener(snackbarAction, hideSnackbar);
@@ -454,6 +539,7 @@ document.addEventListener('keydown', (event) => {
     case 'v': event.preventDefault(); toggleCamera(); break;
     case 'f': event.preventDefault(); toggleClutterFree(); break;
     case 'c': event.preventDefault(); switchCamera(); break;
+    case 'z': event.preventDefault(); toggleVideoViewMode(); break;
     case '1': event.preventDefault(); toggleLocalVideoFullscreen(); break;
     case '2': event.preventDefault(); toggleRemoteVideoFullscreen(); break;
     case 'escape':
@@ -479,19 +565,28 @@ window.addEventListener('orientationchange', () => {
   }
 });
 
-// Prevent zoom on double tap (but allow button interactions)
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (event) => {
-  const now = Date.now();
-  
-  // Only prevent default for video elements to avoid zoom
-  if (event.target.closest('.video-half') || event.target.classList.contains('video-element')) {
-    if (now - lastTouchEnd <= 300) {
-      event.preventDefault();
+// Prevent zoom on double tap for video elements only
+document.addEventListener('touchstart', (event) => {
+  // Only prevent zoom on video elements, not buttons
+  if (event.target.classList.contains('video-element') || 
+      (event.target.closest('.video-half') && !event.target.closest('.control-btn'))) {
+    if (event.touches.length > 1) {
+      event.preventDefault(); // Prevent pinch zoom
     }
-    lastTouchEnd = now;
   }
-}, false);
+}, { passive: false });
+
+// Debug function for mobile testing
+function debugTouch() {
+  console.log('Touch debug info:');
+  console.log('- PointerEvent support:', 'PointerEvent' in window);
+  console.log('- Touch support:', 'ontouchstart' in window);
+  console.log('- User agent:', navigator.userAgent);
+  console.log('- Screen size:', window.innerWidth + 'x' + window.innerHeight);
+}
+
+// Call debug on load
+debugTouch();
 
 // Initialize
 initializeMedia();
