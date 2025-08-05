@@ -39,20 +39,12 @@ export const WelcomeController = {
   hideWelcomeScreen() {
     const welcomeScreen = document.getElementById('welcomeScreen');
     const videoApp = document.getElementById('videoApp');
-    const statusBar = document.getElementById('statusBar');
     
     if (welcomeScreen && videoApp) {
       welcomeScreen.style.display = 'none';
       videoApp.style.display = 'block';
       videoApp.style.marginTop = '0';
       videoApp.style.height = '100vh';
-      
-      // Show status bar
-      if (statusBar) {
-        statusBar.style.display = 'flex';
-        videoApp.style.marginTop = '32px';
-        videoApp.style.height = 'calc(100vh - 32px)';
-      }
     }
   },
 
