@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { AppState, DOM, StateManager } from './state.js';
-import { VideoMode, UI, MediaControls, DebugFeedback } from './ui-controls.js';
+import { VideoMode, UI, MediaControls } from './ui-controls.js';
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -252,217 +252,66 @@ export const FullscreenManager = {
 // EVENT MANAGEMENT
 // =============================================================================
 export const EventManager = {
-  attachEventListener(element, handler, options = {}) {
-    if (!element || typeof handler !== 'function') return;
-
-    const handlerId = Math.random().toString(36).substr(2, 9);
-    let isProcessing = false;
-
-    // Simplified, more reliable event handling
-    const safeHandler = (event) => {
-      if (isProcessing) return;
-      isProcessing = true;
-      
-      try {
-        // Stop all event propagation immediately
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        
-        // Visual feedback for mobile
-        if (element.classList.contains('control-btn')) {
-          element.style.transform = 'scale(0.9)';
-          element.style.transition = 'transform 0.1s';
-          setTimeout(() => {
-            element.style.transform = '';
-            element.style.transition = '';
-          }, 150);
-        }
-        
-        handler();
-      } catch (error) {
-        console.error('Event handler error:', error);
-      } finally {
-        setTimeout(() => { isProcessing = false; }, 200);
-      }
-    };
-
-    // Use only touch events for mobile, only click for desktop
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
-    if (isMobile) {
-      // Mobile: Use only touchend, ignore click
-      element.addEventListener('touchend', safeHandler, { passive: false });
-      
-      // Prevent click events from firing on mobile
-      element.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }, { passive: false });
-      
-      AppState.touchHandlers.set(handlerId, { 
-        element, 
-        handlers: { touchend: safeHandler }
-      });
-    } else {
-      // Desktop: Use only click
-      element.addEventListener('click', safeHandler, { passive: false });
-      AppState.touchHandlers.set(handlerId, { 
-        element, 
-        handlers: { click: safeHandler }
-      });
-    }
-
-    return handlerId;
-  },
-
-  removeEventListener(handlerId) {
-    const handlerInfo = AppState.touchHandlers.get(handlerId);
-    if (handlerInfo) {
-      const { element, handlers } = handlerInfo;
-      
-      // Remove all stored handlers
-      if (handlers.touchend) {
-        element.removeEventListener('touchend', handlers.touchend);
-      }
-      if (handlers.click) {
-        element.removeEventListener('click', handlers.click);
-      }
-      
-      AppState.touchHandlers.delete(handlerId);
-    }
-  },
-
   attachAllEventListeners() {
     if (AppState.eventHandlersAttached) return;
 
-    // Add aggressive mobile CSS fixes
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-      const style = document.createElement('style');
-      style.textContent = `
-        .control-btn {
-          -webkit-tap-highlight-color: transparent !important;
-          -webkit-touch-callout: none !important;
-          -webkit-user-select: none !important;
-          touch-action: manipulation !important;
-          pointer-events: auto !important;
-          position: relative !important;
-          z-index: 999 !important;
-        }
-        .control-btn * {
-          pointer-events: none !important;
-        }
-        #toggleMic, #toggleCam {
-          z-index: 1000 !important;
-        }
-      `;
-      document.head.appendChild(style);
-      
-      // Add direct mobile handlers for critical buttons
-      this.addDirectMobileHandler(DOM.toggleMicBtn, () => {
-        DebugFeedback.showDebug('🎤 Direct mic handler');
-        MediaControls.toggleMicrophone();
-      });
-      
-      this.addDirectMobileHandler(DOM.toggleCamBtn, () => {
-        DebugFeedback.showDebug('📹 Direct camera handler');
-        MediaControls.toggleCamera();
-      });
-      
-      DebugFeedback.showDebug('Mobile aggressive optimization applied');
+    // Simple direct event listeners with proper context binding
+    if (DOM.toggleMicBtn) {
+      DOM.toggleMicBtn.addEventListener('click', () => MediaControls.toggleMicrophone());
     }
-
-    // Regular event listeners
-    this.attachEventListener(DOM.toggleMicBtn, () => {
-      DebugFeedback.showDebug('🎤 Mic button triggered');
-      MediaControls.toggleMicrophone();
-    });
     
-    this.attachEventListener(DOM.toggleCamBtn, () => {
-      DebugFeedback.showDebug('📹 Camera button triggered');
-      MediaControls.toggleCamera();
-    });
+    if (DOM.toggleCamBtn) {
+      DOM.toggleCamBtn.addEventListener('click', () => MediaControls.toggleCamera());
+    }
     
-    this.attachEventListener(DOM.switchCameraBtn, () => {
-      DebugFeedback.showDebug('🔄 Switch camera triggered');
-      MediaControls.switchCamera();
-    });
+    if (DOM.endCallBtn) {
+      DOM.endCallBtn.addEventListener('click', () => MediaControls.endCall());
+    }
     
-    this.attachEventListener(DOM.toggleViewModeBtn, () => {
-      DebugFeedback.showDebug('📺 View mode toggle triggered');
-      VideoMode.toggle();
-    });
+    if (DOM.switchCameraBtn) {
+      DOM.switchCameraBtn.addEventListener('click', () => MediaControls.switchCamera());
+    }
     
-    this.attachEventListener(DOM.fullscreenBtn, () => {
-      DebugFeedback.showDebug('🖥️ Fullscreen toggle triggered');
-      FullscreenManager.toggleClutterFree();
-    });
+    if (DOM.toggleViewModeBtn) {
+      DOM.toggleViewModeBtn.addEventListener('click', () => VideoMode.toggle());
+    }
     
-    this.attachEventListener(DOM.endCallBtn, () => {
-      UI.showSnackbar('📞 Ending call...');
-      window.endCall?.();
-    });
+    if (DOM.fullscreenBtn) {
+      DOM.fullscreenBtn.addEventListener('click', () => FullscreenManager.toggleClutterFree());
+    }
     
-    // Video elements
-    this.attachEventListener(DOM.localVideoHalf, () => {
-      DebugFeedback.showDebug('📱 Local video fullscreen toggled');
-      FullscreenManager.toggleLocalFullscreen();
-    });
+    if (DOM.localVideoHalf) {
+      DOM.localVideoHalf.addEventListener('click', () => FullscreenManager.toggleLocalFullscreen());
+    }
     
-    this.attachEventListener(DOM.remoteVideoHalf, () => {
-      DebugFeedback.showDebug('📱 Remote video fullscreen toggled');
-      FullscreenManager.toggleRemoteFullscreen();
-    });
+    if (DOM.remoteVideoHalf) {
+      DOM.remoteVideoHalf.addEventListener('click', () => FullscreenManager.toggleRemoteFullscreen());
+    }
     
-    // Snackbar
-    this.attachEventListener(DOM.snackbarAction, () => UI.hideSnackbar());
+    if (DOM.snackbarAction) {
+      DOM.snackbarAction.addEventListener('click', () => UI.hideSnackbar());
+    }
     
     // Keyboard shortcuts
-    document.addEventListener('keydown', this.handleKeyboardShortcuts);
+    document.addEventListener('keydown', (event) => this.handleKeyboardShortcuts(event));
     
     // Fullscreen change events
-    document.addEventListener('fullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', this.handleFullscreenChange);
+    document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+    document.addEventListener('mozfullscreenchange', () => this.handleFullscreenChange());
+    document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
+    document.addEventListener('MSFullscreenChange', () => this.handleFullscreenChange());
     
     // Orientation change
-    window.addEventListener('orientationchange', this.handleOrientationChange);
+    window.addEventListener('orientationchange', () => this.handleOrientationChange());
     
-    // Revert button (created dynamically)
+    // Revert button
     document.addEventListener('click', (event) => {
       if (event.target.closest('#revertBtn')) {
-        DebugFeedback.showDebug('⏪ Revert button triggered');
         FullscreenManager.toggleClutterFree();
       }
     });
 
     AppState.eventHandlersAttached = true;
-    DebugFeedback.showSuccess('Event listeners attached successfully');
-  },
-
-  // Direct mobile handler for unresponsive buttons
-  addDirectMobileHandler(element, handler) {
-    if (!element) return;
-    
-    const directHandler = (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      
-      // Force visual feedback
-      element.style.transform = 'scale(0.85)';
-      element.style.background = '#9C27B0'; // Purple flash
-      
-      setTimeout(() => {
-        element.style.transform = '';
-        element.style.background = '';
-      }, 200);
-      
-      handler();
-    };
-    
-    // Multiple event types for maximum compatibility
-    element.addEventListener('touchend', directHandler, { passive: false });
-    element.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
   },
 
   handleKeyboardShortcuts(event) {

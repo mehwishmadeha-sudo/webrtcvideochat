@@ -35,6 +35,40 @@
   --md-easing: cubic-bezier(0.2, 0.0, 0, 1.0);
 }
 
+/* Update Status Bar - Temporary for deployment verification */
+.update-status-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: linear-gradient(90deg, #4CAF50, #2E7D32);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Adjust main video app to account for status bar */
+.video-app {
+  margin-top: 32px;
+  height: calc(100vh - 32px);
+}
+
 /* Base Reset */
 * {
   margin: 0;

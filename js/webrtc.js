@@ -5,7 +5,7 @@
 
 import { db, ref, onValue, set, remove } from '../firebase-config.js';
 import { DOM, StateManager } from './state.js';
-import { VideoMode, UI, DebugFeedback } from './ui-controls.js';
+import { VideoMode, UI } from './ui-controls.js';
 
 // =============================================================================
 // FIREBASE REFERENCES
@@ -28,8 +28,6 @@ export const peerConnection = new RTCPeerConnection({
 export const WebRTC = {
   async initializeMedia() {
     try {
-      UI.showSnackbar('🎥 Requesting camera and microphone access...');
-      
       const constraints = {
         video: { 
           facingMode: 'user', 
@@ -47,31 +45,22 @@ export const WebRTC = {
       StateManager.setLocalStream(localStream);
       DOM.localVideo.srcObject = localStream;
       
-      // Initialize video mode
       VideoMode.apply(DOM.localVideo);
       
       localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
       });
 
-      DebugFeedback.showSuccess('Media access granted, starting call setup...');
       this.startSignaling();
       
     } catch (error) {
-      DebugFeedback.showError(`Media access failed: ${error.message}`);
-      
-      if (error.name === 'NotAllowedError') {
-        UI.showSnackbar('❌ Camera/microphone permission denied', 'Retry', () => this.initializeMedia());
-      } else if (error.name === 'NotFoundError') {
-        UI.showSnackbar('❌ No camera/microphone found', 'Retry', () => this.initializeMedia());
-      } else {
-        UI.showSnackbar('❌ Media access failed', 'Retry', () => this.initializeMedia());
-      }
+      console.error('Media error:', error);
+      UI.showSnackbar('Camera/microphone access failed', 'Retry', () => this.initializeMedia());
     }
   },
 
   async startSignaling() {
-    UI.showSnackbar('�� Starting signaling process...');
+    console.log('Starting signaling...');
     
     const offerSnapshot = await new Promise(resolve => {
       onValue(FirebaseRefs.offer, resolve, { onlyOnce: true });
@@ -84,39 +73,31 @@ export const WebRTC = {
     const answer = answerSnapshot.val();
     
     if (offer == null && answer == null) {
-      DebugFeedback.showDebug('📡 Scenario 1: Creating new call (first peer)');
+      console.log('Creating offer...');
       const myOffer = await this.createOffer();
       await set(FirebaseRefs.offer, { sdp: myOffer.sdp, type: myOffer.type });
-      UI.showSnackbar('📞 Waiting for someone to join...');
       
       onValue(FirebaseRefs.answer, async (snapshot) => {
         const answerData = snapshot.val();
         if (answerData) {
-          UI.showSnackbar('🎉 Someone joined! Connecting...');
           await this.connectToPeer(answerData);
         }
       });
     } else if (offer != null && answer == null) {
-      DebugFeedback.showDebug('📡 Scenario 2: Joining existing call (second peer)');
-      UI.showSnackbar('📞 Joining call...');
+      console.log('Creating answer...');
       const myAnswer = await this.createAnswer(offer);
       await set(FirebaseRefs.answer, { sdp: myAnswer.sdp, type: myAnswer.type });
-      UI.showSnackbar('✅ Successfully joined call');
     } else if (offer != null && answer != null) {
-      DebugFeedback.showDebug('📡 Scenario 3: Cleaning up stale session');
-      UI.showSnackbar('🔄 Cleaning up previous session...');
-      
+      console.log('Cleaning up stale session...');
       await remove(FirebaseRefs.offer);
       await remove(FirebaseRefs.answer);
       
       const myOffer = await this.createOffer();
       await set(FirebaseRefs.offer, { sdp: myOffer.sdp, type: myOffer.type });
-      UI.showSnackbar('📞 Waiting for someone to join...');
       
       onValue(FirebaseRefs.answer, async (snapshot) => {
         const answerData = snapshot.val();
         if (answerData) {
-          UI.showSnackbar('🎉 Someone joined! Connecting...');
           await this.connectToPeer(answerData);
         }
       });
@@ -187,7 +168,6 @@ export const WebRTC = {
 peerConnection.ontrack = (event) => {
   DOM.remoteVideo.srcObject = event.streams[0];
   VideoMode.apply(DOM.remoteVideo);
-  DebugFeedback.showSuccess('📺 Remote video stream received');
 };
 
 peerConnection.onconnectionstatechange = () => {
@@ -196,28 +176,20 @@ peerConnection.onconnectionstatechange = () => {
   UI.updateConnectionDot();
   
   if (StateManager.isConnected()) {
-    DebugFeedback.showSuccess('🎉 Video call connected successfully!');
-  } else if (state === 'disconnected') {
-    UI.showSnackbar('⚠️ Connection lost - attempting to reconnect...');
-  } else if (state === 'failed') {
-    UI.showSnackbar('❌ Connection failed - please refresh and try again');
+    console.log('Connected!');
   }
 };
 
 peerConnection.onicecandidate = (event) => {
   if (event.candidate) {
-    DebugFeedback.showDebug(`🔗 ICE candidate: ${event.candidate.type}`);
-  } else {
-    DebugFeedback.showDebug('🔗 ICE gathering completed');
+    console.log('ICE candidate:', event.candidate.type);
   }
 };
 
 peerConnection.onicegatheringstatechange = () => {
   const state = peerConnection.iceGatheringState;
-  if (state === 'gathering') {
-    UI.showSnackbar('🔗 Establishing connection...');
-  } else if (state === 'complete') {
-    DebugFeedback.showDebug('🔗 Connection setup complete');
+  if (state === 'complete') {
+    console.log('ICE gathering complete');
   }
 };
 
