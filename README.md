@@ -11,7 +11,7 @@ A modern, minimal video calling web application built with WebRTC and Material 3
 - **🎛️ Intuitive Controls**: Mic, camera, fullscreen, and camera switching
 - **📺 Dual View Modes**: Split-screen and individual fullscreen views
 - **🔄 Aspect Ratio Control**: Toggle between fit (preserve aspect ratio) and fill (crop to fill) modes
-- **🖥️ Clutter-Free Mode**: Hide controls for immersive experience
+- **🖥️ Clutter-Free Mode**: Hide controls and enter full browser fullscreen (like F11) for immersive experience
 - **⌨️ Keyboard Shortcuts**: Quick access to all functions
 
 ## 🚀 Live Demo

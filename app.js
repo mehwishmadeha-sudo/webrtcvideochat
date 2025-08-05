@@ -45,6 +45,11 @@ function isLargeScreen() {
   return window.innerWidth >= 1024;
 }
 
+// Check if browser is currently in fullscreen mode (cross-browser)
+function isCurrentlyFullscreen() {
+  return !!(document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+
 // Initialize media
 async function initializeMedia() {
   try {
@@ -56,8 +61,8 @@ async function initializeMedia() {
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
     localVideo.srcObject = localStream;
     
-    // Initialize video with fit mode (aspect ratio preserving)
-    localVideo.classList.add('fit-mode');
+    // Initialize video with current mode (fit mode by default)
+    applyVideoModeToElement(localVideo);
     
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
@@ -191,8 +196,8 @@ async function connectToPeer(answer) {
 // WebRTC events
 peerConnection.ontrack = (event) => {
   remoteVideo.srcObject = event.streams[0];
-  // Initialize remote video with fit mode (aspect ratio preserving)
-  remoteVideo.classList.add('fit-mode');
+  // Initialize remote video with current mode (fit mode by default)
+  applyVideoModeToElement(remoteVideo);
   console.log('Remote stream received');
 };
 
@@ -235,13 +240,29 @@ async function toggleClutterFree() {
   const fullscreenIcon = fullscreenBtn.querySelector('.material-symbols-outlined');
   
   if (isClutterFree) {
-    // On large screens, enter browser fullscreen
-    if (isLargeScreen() && !document.fullscreenElement) {
+    // Always try to enter browser fullscreen (like F11) regardless of screen size
+    if (!isCurrentlyFullscreen()) {
       try {
         await document.documentElement.requestFullscreen();
         isBrowserFullscreen = true;
       } catch (error) {
         console.log('Browser fullscreen not supported');
+        // Fallback: try different fullscreen methods for better browser compatibility
+        try {
+          if (document.documentElement.mozRequestFullScreen) {
+            await document.documentElement.mozRequestFullScreen();
+            isBrowserFullscreen = true;
+          } else if (document.documentElement.webkitRequestFullscreen) {
+            await document.documentElement.webkitRequestFullscreen();
+            isBrowserFullscreen = true;
+          } else if (document.documentElement.msRequestFullscreen) {
+            await document.documentElement.msRequestFullscreen();
+            isBrowserFullscreen = true;
+          }
+        } catch (fallbackError) {
+          console.log('All fullscreen methods failed');
+          showSnackbar('Fullscreen not supported on this browser');
+        }
       }
     }
     
@@ -261,9 +282,17 @@ async function toggleClutterFree() {
     fullscreenIcon.textContent = 'fullscreen_exit';
   } else {
     // Exit browser fullscreen
-    if (isBrowserFullscreen && document.fullscreenElement) {
+    if (isBrowserFullscreen && isCurrentlyFullscreen()) {
       try {
-        await document.exitFullscreen();
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          await document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
         isBrowserFullscreen = false;
       } catch (error) {
         console.log('Error exiting fullscreen');
@@ -360,13 +389,7 @@ async function switchCamera() {
     localVideo.srcObject = localStream;
     
     // Maintain current video mode after camera switch
-    if (isVideoFitMode) {
-      localVideo.classList.add('fit-mode');
-      localVideo.classList.remove('fill-mode');
-    } else {
-      localVideo.classList.add('fill-mode');
-      localVideo.classList.remove('fit-mode');
-    }
+    applyVideoModeToElement(localVideo);
     
   } catch (error) {
     console.error('Camera switch failed:', error);
@@ -378,6 +401,8 @@ function toggleLocalVideoFullscreen() {
   
   if (isLocalFullscreen) {
     localVideoHalf.classList.add('video-half--fullscreen');
+    // Ensure video mode is applied in fullscreen
+    applyVideoModeToElement(localVideo);
     if (isRemoteFullscreen) {
       remoteVideoHalf.classList.remove('video-half--fullscreen');
       isRemoteFullscreen = false;
@@ -392,6 +417,8 @@ function toggleRemoteVideoFullscreen() {
   
   if (isRemoteFullscreen) {
     remoteVideoHalf.classList.add('video-half--fullscreen');
+    // Ensure video mode is applied in fullscreen
+    applyVideoModeToElement(remoteVideo);
     if (isLocalFullscreen) {
       localVideoHalf.classList.remove('video-half--fullscreen');
       isLocalFullscreen = false;
@@ -401,20 +428,23 @@ function toggleRemoteVideoFullscreen() {
   }
 }
 
+// Helper function to apply video mode to a specific element
+function applyVideoModeToElement(videoElement) {
+  if (isVideoFitMode) {
+    videoElement.classList.remove('fill-mode');
+    videoElement.classList.add('fit-mode');
+  } else {
+    videoElement.classList.remove('fit-mode');
+    videoElement.classList.add('fill-mode');
+  }
+}
+
 function toggleVideoViewMode() {
   isVideoFitMode = !isVideoFitMode;
   
   // Update both video elements
   const videos = [localVideo, remoteVideo];
-  videos.forEach(video => {
-    if (isVideoFitMode) {
-      video.classList.remove('fill-mode');
-      video.classList.add('fit-mode');
-    } else {
-      video.classList.remove('fit-mode');
-      video.classList.add('fill-mode');
-    }
-  });
+  videos.forEach(video => applyVideoModeToElement(video));
   
   // Update button icon and show feedback
   if (isVideoFitMode) {
@@ -458,15 +488,23 @@ function hideSnackbar() {
   snackbar.classList.remove('show');
 }
 
-// Browser fullscreen change handler
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && isBrowserFullscreen) {
+// Browser fullscreen change handler - handle all browser prefixes
+function handleFullscreenChange() {
+  const isInFullscreen = !!(document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  
+  if (!isInFullscreen && isBrowserFullscreen) {
     isBrowserFullscreen = false;
     if (isClutterFree) {
       toggleClutterFree();
     }
   }
-});
+}
+
+// Add event listeners for all browser prefixes
+document.addEventListener('fullscreenchange', handleFullscreenChange);
+document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
 // Event listeners - Universal touch/click handling
 function addMobileEventListener(element, handler) {

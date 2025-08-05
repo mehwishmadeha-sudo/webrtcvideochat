@@ -185,10 +185,19 @@ body {
   background: #000 !important;
 }
 
-/* Ensure fullscreen video element fills the container */
+/* Ensure fullscreen video element respects view mode */
 .video-half--fullscreen .video-element {
   width: 100% !important;
   height: 100% !important;
+  /* Remove the forced object-fit: cover to allow mode switching */
+}
+
+/* Fullscreen video modes */
+.video-half--fullscreen .video-element.fit-mode {
+  object-fit: contain !important;
+}
+
+.video-half--fullscreen .video-element.fill-mode {
   object-fit: cover !important;
 }
 
@@ -622,6 +631,36 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Fullscreen optimizations */
+:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-moz-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Ensure video app takes full space in browser fullscreen */
+:fullscreen .video-app,
+:-webkit-full-screen .video-app,
+:-moz-full-screen .video-app,
+:-ms-fullscreen .video-app {
+  width: 100vw !important;
+  height: 100vh !important;
 }
 
 /* High Contrast */
