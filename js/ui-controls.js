@@ -341,5 +341,48 @@ export const MediaControls = {
   }
 }; 
 
+// Add mobile testing function
+export const MobileTesting = {
+  testButtons() {
+    if (!('ontouchstart' in window)) {
+      console.log('Not a mobile device');
+      return;
+    }
+
+    const buttons = [
+      { element: DOM.toggleMicBtn, name: 'Microphone' },
+      { element: DOM.toggleCamBtn, name: 'Camera' },
+      { element: DOM.switchCameraBtn, name: 'Switch Camera' }
+    ];
+
+    buttons.forEach(({ element, name }) => {
+      if (element) {
+        // Force a visible test on the button
+        element.style.border = '2px solid lime';
+        element.addEventListener('touchend', () => {
+          element.style.background = 'lime';
+          UI.showSnackbar(`✅ ${name} button is responsive!`);
+          setTimeout(() => {
+            element.style.background = '';
+            element.style.border = '';
+          }, 1000);
+        }, { passive: false });
+        console.log(`${name} button test handler added`);
+      } else {
+        console.error(`${name} button not found`);
+      }
+    });
+
+    UI.showSnackbar('🧪 Mobile button test mode enabled - tap buttons to test');
+  }
+};
+
+// Auto-run test on mobile
+if ('ontouchstart' in window && DOM.isReady()) {
+  setTimeout(() => {
+    MobileTesting.testButtons();
+  }, 2000);
+}
+
 // Export DebugFeedback for use in other modules
 export { DebugFeedback }; 

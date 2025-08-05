@@ -69,25 +69,42 @@
   isolation: isolate;
 }
 
-/* Mobile-specific button fixes */
-@media (pointer: coarse) {
+/* Mobile-specific button fixes - Enhanced */
+@media (pointer: coarse), (max-width: 768px) {
   .control-btn {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
     touch-action: manipulation !important;
     pointer-events: auto !important;
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    /* Prevent any interference */
+    position: relative !important;
+    z-index: 10 !important;
+    isolation: isolate !important;
   }
   
+  /* Ensure child elements don't interfere */
   .control-btn * {
     pointer-events: none !important;
     touch-action: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
   }
   
+  /* Force active state on touch */
   .control-btn:active {
-    transform: scale(0.95) !important;
+    transform: scale(0.9) !important;
     transition: transform 0.1s ease !important;
+  }
+  
+  /* Critical buttons get extra protection */
+  #toggleMic, #toggleCam {
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    z-index: 100 !important;
   }
 }
 

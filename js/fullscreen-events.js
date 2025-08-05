@@ -66,14 +66,25 @@ export const FullscreenManager = {
     StateManager.setLocalFullscreen(newState);
     
     if (newState) {
-      DOM.localVideoHalf.classList.add('video-half--fullscreen');
+      // In clutter-free mode, don't use the fullscreen class that might interfere
+      if (StateManager.isClutterFree()) {
+        // Create a custom fullscreen overlay for clutter-free mode
+        this.createVideoOverlay(DOM.localVideo, 'local');
+      } else {
+        DOM.localVideoHalf.classList.add('video-half--fullscreen');
+      }
+      
       VideoMode.apply(DOM.localVideo); // Ensure mode is applied
+      
       if (StateManager.isRemoteFullscreen()) {
-        DOM.remoteVideoHalf.classList.remove('video-half--fullscreen');
-        StateManager.setRemoteFullscreen(false);
+        this.exitRemoteFullscreen();
       }
     } else {
-      DOM.localVideoHalf.classList.remove('video-half--fullscreen');
+      if (StateManager.isClutterFree()) {
+        this.removeVideoOverlay('local');
+      } else {
+        DOM.localVideoHalf.classList.remove('video-half--fullscreen');
+      }
     }
   },
 
@@ -82,12 +93,91 @@ export const FullscreenManager = {
     StateManager.setRemoteFullscreen(newState);
     
     if (newState) {
-      DOM.remoteVideoHalf.classList.add('video-half--fullscreen');
-      VideoMode.apply(DOM.remoteVideo); // Ensure mode is applied
-      if (StateManager.isLocalFullscreen()) {
-        DOM.localVideoHalf.classList.remove('video-half--fullscreen');
-        StateManager.setLocalFullscreen(false);
+      // In clutter-free mode, don't use the fullscreen class that might interfere
+      if (StateManager.isClutterFree()) {
+        // Create a custom fullscreen overlay for clutter-free mode
+        this.createVideoOverlay(DOM.remoteVideo, 'remote');
+      } else {
+        DOM.remoteVideoHalf.classList.add('video-half--fullscreen');
       }
+      
+      VideoMode.apply(DOM.remoteVideo); // Ensure mode is applied
+      
+      if (StateManager.isLocalFullscreen()) {
+        this.exitLocalFullscreen();
+      }
+    } else {
+      if (StateManager.isClutterFree()) {
+        this.removeVideoOverlay('remote');
+      } else {
+        DOM.remoteVideoHalf.classList.remove('video-half--fullscreen');
+      }
+    }
+  },
+
+  createVideoOverlay(videoElement, type) {
+    // Remove any existing overlay first
+    this.removeVideoOverlay(type);
+    
+    const overlay = document.createElement('div');
+    overlay.id = `${type}-video-overlay`;
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: #000 !important;
+      z-index: 1500 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    `;
+    
+    // Clone the video element
+    const videoClone = videoElement.cloneNode(true);
+    videoClone.style.cssText = `
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: ${StateManager.getVideoMode() === 'fit' ? 'contain' : 'cover'} !important;
+    `;
+    
+    // Copy the stream from original to clone
+    videoClone.srcObject = videoElement.srcObject;
+    
+    overlay.appendChild(videoClone);
+    document.body.appendChild(overlay);
+    
+    // Add click handler to exit fullscreen
+    overlay.addEventListener('click', () => {
+      if (type === 'local') {
+        this.toggleLocalFullscreen();
+      } else {
+        this.toggleRemoteFullscreen();
+      }
+    });
+  },
+
+  removeVideoOverlay(type) {
+    const overlay = document.getElementById(`${type}-video-overlay`);
+    if (overlay) {
+      overlay.remove();
+    }
+  },
+
+  exitLocalFullscreen() {
+    StateManager.setLocalFullscreen(false);
+    if (StateManager.isClutterFree()) {
+      this.removeVideoOverlay('local');
+    } else {
+      DOM.localVideoHalf.classList.remove('video-half--fullscreen');
+    }
+  },
+
+  exitRemoteFullscreen() {
+    StateManager.setRemoteFullscreen(false);
+    if (StateManager.isClutterFree()) {
+      this.removeVideoOverlay('remote');
     } else {
       DOM.remoteVideoHalf.classList.remove('video-half--fullscreen');
     }
@@ -141,15 +231,17 @@ export const FullscreenManager = {
       
       videoApp.classList.remove('clutter-free');
       
-      // Reset video fullscreens
+      // Reset video fullscreens properly in clutter-free mode
       if (StateManager.isLocalFullscreen()) {
-        DOM.localVideoHalf.classList.remove('video-half--fullscreen');
-        StateManager.setLocalFullscreen(false);
+        this.exitLocalFullscreen();
       }
       if (StateManager.isRemoteFullscreen()) {
-        DOM.remoteVideoHalf.classList.remove('video-half--fullscreen');
-        StateManager.setRemoteFullscreen(false);
+        this.exitRemoteFullscreen();
       }
+      
+      // Clean up any overlays
+      this.removeVideoOverlay('local');
+      this.removeVideoOverlay('remote');
       
       fullscreenIcon.textContent = 'fullscreen';
     }
@@ -165,77 +257,59 @@ export const EventManager = {
 
     const handlerId = Math.random().toString(36).substr(2, 9);
     let isProcessing = false;
-    let touchStarted = false;
 
+    // Simplified, more reliable event handling
     const safeHandler = (event) => {
       if (isProcessing) return;
       isProcessing = true;
       
       try {
+        // Stop all event propagation immediately
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        
+        // Visual feedback for mobile
+        if (element.classList.contains('control-btn')) {
+          element.style.transform = 'scale(0.9)';
+          element.style.transition = 'transform 0.1s';
+          setTimeout(() => {
+            element.style.transform = '';
+            element.style.transition = '';
+          }, 150);
+        }
+        
         handler();
       } catch (error) {
         console.error('Event handler error:', error);
       } finally {
-        setTimeout(() => { isProcessing = false; }, 150);
+        setTimeout(() => { isProcessing = false; }, 200);
       }
     };
 
-    // Mobile-first approach with better touch handling
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-      // Mobile: Use touch events with proper handling
-      const handleTouchStart = (event) => {
-        touchStarted = true;
-        event.stopPropagation();
-      };
-
-      const handleTouchEnd = (event) => {
-        if (touchStarted) {
-          touchStarted = false;
-          event.preventDefault();
-          event.stopPropagation();
-          safeHandler(event);
-        }
-      };
-
-      const handleClick = (event) => {
-        // Prevent click if touch was handled
-        if (touchStarted) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        safeHandler(event);
-      };
-
-      element.addEventListener('touchstart', handleTouchStart, { passive: true });
-      element.addEventListener('touchend', handleTouchEnd, { passive: false });
-      element.addEventListener('click', handleClick, { passive: false });
-
-      // Store all handlers for cleanup
+    // Use only touch events for mobile, only click for desktop
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    if (isMobile) {
+      // Mobile: Use only touchend, ignore click
+      element.addEventListener('touchend', safeHandler, { passive: false });
+      
+      // Prevent click events from firing on mobile
+      element.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }, { passive: false });
+      
       AppState.touchHandlers.set(handlerId, { 
         element, 
-        handlers: { handleTouchStart, handleTouchEnd, handleClick }
+        handlers: { touchend: safeHandler }
       });
     } else {
-      // Desktop: Use pointer events or click
-      if ('PointerEvent' in window) {
-        const handlePointer = (event) => {
-          if (event.pointerType === 'touch') return; // Let touch events handle this
-          event.preventDefault();
-          event.stopPropagation();
-          safeHandler(event);
-        };
-        element.addEventListener('pointerup', handlePointer, { passive: false });
-        AppState.touchHandlers.set(handlerId, { element, handlers: { handlePointer } });
-      } else {
-        const handleClick = (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          safeHandler(event);
-        };
-        element.addEventListener('click', handleClick, { passive: false });
-        AppState.touchHandlers.set(handlerId, { element, handlers: { handleClick } });
-      }
+      // Desktop: Use only click
+      element.addEventListener('click', safeHandler, { passive: false });
+      AppState.touchHandlers.set(handlerId, { 
+        element, 
+        handlers: { click: safeHandler }
+      });
     }
 
     return handlerId;
@@ -247,17 +321,12 @@ export const EventManager = {
       const { element, handlers } = handlerInfo;
       
       // Remove all stored handlers
-      Object.entries(handlers).forEach(([eventType, handler]) => {
-        if (eventType === 'handleTouchStart') {
-          element.removeEventListener('touchstart', handler);
-        } else if (eventType === 'handleTouchEnd') {
-          element.removeEventListener('touchend', handler);
-        } else if (eventType === 'handlePointer') {
-          element.removeEventListener('pointerup', handler);
-        } else if (eventType === 'handleClick') {
-          element.removeEventListener('click', handler);
-        }
-      });
+      if (handlers.touchend) {
+        element.removeEventListener('touchend', handlers.touchend);
+      }
+      if (handlers.click) {
+        element.removeEventListener('click', handlers.click);
+      }
       
       AppState.touchHandlers.delete(handlerId);
     }
@@ -266,7 +335,7 @@ export const EventManager = {
   attachAllEventListeners() {
     if (AppState.eventHandlersAttached) return;
 
-    // Add CSS to prevent button interference on mobile
+    // Add aggressive mobile CSS fixes
     if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       const style = document.createElement('style');
       style.textContent = `
@@ -276,16 +345,33 @@ export const EventManager = {
           -webkit-user-select: none !important;
           touch-action: manipulation !important;
           pointer-events: auto !important;
+          position: relative !important;
+          z-index: 999 !important;
         }
         .control-btn * {
           pointer-events: none !important;
         }
+        #toggleMic, #toggleCam {
+          z-index: 1000 !important;
+        }
       `;
       document.head.appendChild(style);
-      DebugFeedback.showDebug('Mobile touch optimization applied');
+      
+      // Add direct mobile handlers for critical buttons
+      this.addDirectMobileHandler(DOM.toggleMicBtn, () => {
+        DebugFeedback.showDebug('🎤 Direct mic handler');
+        MediaControls.toggleMicrophone();
+      });
+      
+      this.addDirectMobileHandler(DOM.toggleCamBtn, () => {
+        DebugFeedback.showDebug('📹 Direct camera handler');
+        MediaControls.toggleCamera();
+      });
+      
+      DebugFeedback.showDebug('Mobile aggressive optimization applied');
     }
 
-    // Control buttons with specific mobile handling
+    // Regular event listeners
     this.attachEventListener(DOM.toggleMicBtn, () => {
       DebugFeedback.showDebug('🎤 Mic button triggered');
       MediaControls.toggleMicrophone();
@@ -350,17 +436,33 @@ export const EventManager = {
       }
     });
 
-    // Prevent touch zoom on buttons only
-    document.addEventListener('touchstart', (event) => {
-      if (event.target.closest('.control-btn')) {
-        if (event.touches.length > 1) {
-          event.preventDefault();
-        }
-      }
-    }, { passive: false });
-
     AppState.eventHandlersAttached = true;
     DebugFeedback.showSuccess('Event listeners attached successfully');
+  },
+
+  // Direct mobile handler for unresponsive buttons
+  addDirectMobileHandler(element, handler) {
+    if (!element) return;
+    
+    const directHandler = (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      
+      // Force visual feedback
+      element.style.transform = 'scale(0.85)';
+      element.style.background = '#9C27B0'; // Purple flash
+      
+      setTimeout(() => {
+        element.style.transform = '';
+        element.style.background = '';
+      }, 200);
+      
+      handler();
+    };
+    
+    // Multiple event types for maximum compatibility
+    element.addEventListener('touchend', directHandler, { passive: false });
+    element.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
   },
 
   handleKeyboardShortcuts(event) {
