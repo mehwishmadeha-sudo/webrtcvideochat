@@ -15,11 +15,18 @@ import { WebRTC } from './js/webrtc.js';
 const App = {
   async initialize() {
     try {
-      UI.showSnackbar('🚀 Initializing Video Call App...');
+      console.log('🚀 Starting Video Call App initialization...');
       
-      // Initialize DOM cache
-      DOM.init();
-      DebugFeedback.showDebug('DOM elements cached');
+      // Initialize DOM cache first and check if successful
+      const domReady = DOM.init();
+      if (!domReady) {
+        console.error('DOM initialization failed - retrying in 100ms');
+        setTimeout(() => this.initialize(), 100);
+        return;
+      }
+
+      // Now we can safely use UI functions
+      UI.showSnackbar('🚀 Initializing Video Call App...');
       
       // Initialize video mode system
       VideoMode.initialize();
@@ -32,22 +39,33 @@ const App = {
       
       DebugFeedback.showSuccess('App initialized successfully - ready for video call!');
     } catch (error) {
-      DebugFeedback.showError(`App initialization failed: ${error.message}`);
-      UI.showSnackbar('❌ App initialization failed', 'Retry', () => this.initialize());
+      console.error('App initialization failed:', error);
+      
+      // Try to show error via snackbar if possible, otherwise use console
+      if (DOM.isReady()) {
+        DebugFeedback.showError(`App initialization failed: ${error.message}`);
+        UI.showSnackbar('❌ App initialization failed', 'Retry', () => this.initialize());
+      } else {
+        console.error('Cannot show UI error - DOM not ready. Error:', error.message);
+        // Retry initialization after a delay
+        setTimeout(() => this.initialize(), 500);
+      }
     }
   }
 };
 
 // =============================================================================
-// APPLICATION STARTUP
+// APPLICATION STARTUP WITH PROPER DOM READY HANDLING
 // =============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  App.initialize();
-});
-
-// For immediate execution if DOM is already loaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', App.initialize);
-} else {
-  App.initialize();
+function startApp() {
+  if (document.readyState === 'loading') {
+    // DOM not ready yet, wait for it
+    document.addEventListener('DOMContentLoaded', App.initialize);
+  } else {
+    // DOM is ready, start immediately
+    App.initialize();
+  }
 }
+
+// Start the application
+startApp();

@@ -44,26 +44,60 @@ export const DOM = {
   camIcon: null,
   viewModeIcon: null,
   connectionDot: null,
+  initialized: false,
 
-  // Initialize DOM cache
+  // Initialize DOM cache with error checking
   init() {
-    this.localVideo = document.getElementById("localVideo");
-    this.remoteVideo = document.getElementById("remoteVideo");
-    this.localVideoHalf = document.getElementById("localVideoHalf");
-    this.remoteVideoHalf = document.getElementById("remoteVideoHalf");
-    this.toggleMicBtn = document.getElementById("toggleMic");
-    this.toggleCamBtn = document.getElementById("toggleCam");
-    this.endCallBtn = document.getElementById("endCallBtn");
-    this.fullscreenBtn = document.getElementById("fullscreenBtn");
-    this.switchCameraBtn = document.getElementById("switchCamera");
-    this.toggleViewModeBtn = document.getElementById("toggleViewMode");
-    this.snackbar = document.getElementById("snackbar");
-    this.snackbarText = document.getElementById("snackbarText");
-    this.snackbarAction = document.getElementById("snackbarAction");
-    this.micIcon = document.getElementById("micIcon");
-    this.camIcon = document.getElementById("camIcon");
-    this.viewModeIcon = document.getElementById("viewModeIcon");
-    this.connectionDot = document.getElementById('connectionDot');
+    try {
+      // Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        console.log('DOM not ready yet, waiting...');
+        return false;
+      }
+
+      this.localVideo = document.getElementById("localVideo");
+      this.remoteVideo = document.getElementById("remoteVideo");
+      this.localVideoHalf = document.getElementById("localVideoHalf");
+      this.remoteVideoHalf = document.getElementById("remoteVideoHalf");
+      this.toggleMicBtn = document.getElementById("toggleMic");
+      this.toggleCamBtn = document.getElementById("toggleCam");
+      this.endCallBtn = document.getElementById("endCallBtn");
+      this.fullscreenBtn = document.getElementById("fullscreenBtn");
+      this.switchCameraBtn = document.getElementById("switchCamera");
+      this.toggleViewModeBtn = document.getElementById("toggleViewMode");
+      this.snackbar = document.getElementById("snackbar");
+      this.snackbarText = document.getElementById("snackbarText");
+      this.snackbarAction = document.getElementById("snackbarAction");
+      this.micIcon = document.getElementById("micIcon");
+      this.camIcon = document.getElementById("camIcon");
+      this.viewModeIcon = document.getElementById("viewModeIcon");
+      this.connectionDot = document.getElementById('connectionDot');
+
+      // Check if critical elements exist
+      const criticalElements = [
+        'localVideo', 'remoteVideo', 'snackbar', 'snackbarText', 
+        'toggleMicBtn', 'toggleCamBtn'
+      ];
+      
+      const missingElements = criticalElements.filter(elementName => !this[elementName]);
+      
+      if (missingElements.length > 0) {
+        console.error('Missing critical DOM elements:', missingElements);
+        return false;
+      }
+
+      this.initialized = true;
+      console.log('DOM elements successfully initialized');
+      return true;
+    } catch (error) {
+      console.error('DOM initialization failed:', error);
+      return false;
+    }
+  },
+
+  // Check if DOM is ready
+  isReady() {
+    return this.initialized && this.snackbarText !== null;
   }
 };
 

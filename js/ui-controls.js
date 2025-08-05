@@ -10,28 +10,36 @@ import { AppState, DOM, StateManager } from './state.js';
 // =============================================================================
 const DebugFeedback = {
   showDebug(message, isError = false) {
-    // Show debug messages as snackbars for mobile users
-    if (isError) {
-      UI.showSnackbar(`❌ ${message}`);
-    } else {
-      UI.showSnackbar(`ℹ️ ${message}`);
+    // Check if DOM is ready before showing snackbar
+    if (DOM.isReady()) {
+      if (isError) {
+        UI.showSnackbar(`❌ ${message}`);
+      } else {
+        UI.showSnackbar(`ℹ️ ${message}`);
+      }
     }
-    // Still log to console for desktop development
+    // Always log to console
     console.log(message);
   },
 
   showSuccess(message) {
-    UI.showSnackbar(`✅ ${message}`);
+    if (DOM.isReady()) {
+      UI.showSnackbar(`✅ ${message}`);
+    }
     console.log(message);
   },
 
   showError(message) {
-    UI.showSnackbar(`❌ ${message}`);
+    if (DOM.isReady()) {
+      UI.showSnackbar(`❌ ${message}`);
+    }
     console.error(message);
   },
 
   showWarning(message) {
-    UI.showSnackbar(`⚠️ ${message}`);
+    if (DOM.isReady()) {
+      UI.showSnackbar(`⚠️ ${message}`);
+    }
     console.warn(message);
   }
 };
@@ -78,10 +86,20 @@ export const VideoMode = {
   },
 
   initialize() {
+    if (!DOM.viewModeIcon) {
+      console.warn('VideoMode initialize: viewModeIcon not available yet');
+      return;
+    }
+    
     StateManager.setVideoMode('fit');
     this.applyToAll();
     DOM.viewModeIcon.textContent = 'fit_screen';
-    UI.showSnackbar('✅ Video mode system initialized');
+    
+    if (DOM.isReady()) {
+      UI.showSnackbar('✅ Video mode system initialized');
+    } else {
+      console.log('Video mode system initialized');
+    }
   }
 };
 
@@ -90,37 +108,54 @@ export const VideoMode = {
 // =============================================================================
 export const UI = {
   updateConnectionDot() {
+    if (!DOM.connectionDot) {
+      console.warn('Connection dot element not available');
+      return;
+    }
+
     if (StateManager.isConnected()) {
       DOM.connectionDot.classList.add('connected');
       DOM.connectionDot.classList.remove('disconnected');
-      this.showSnackbar('🔗 Connection established');
+      if (DOM.isReady()) {
+        this.showSnackbar('🔗 Connection established');
+      }
     } else {
       DOM.connectionDot.classList.add('disconnected');
       DOM.connectionDot.classList.remove('connected');
-      this.showSnackbar('⚠️ Connection lost');
+      if (DOM.isReady()) {
+        this.showSnackbar('⚠️ Connection lost');
+      }
     }
   },
 
   showSnackbar(message, actionText = null, actionCallback = null) {
+    // Safety check for DOM elements
+    if (!DOM.snackbarText || !DOM.snackbar) {
+      console.warn('Snackbar elements not available:', message);
+      return;
+    }
+
     DOM.snackbarText.textContent = message;
     
-    if (actionText && actionCallback) {
+    if (actionText && actionCallback && DOM.snackbarAction) {
       DOM.snackbarAction.textContent = actionText;
       DOM.snackbarAction.style.display = 'block';
       DOM.snackbarAction.onclick = () => {
         this.hideSnackbar();
         actionCallback();
       };
-    } else {
+    } else if (DOM.snackbarAction) {
       DOM.snackbarAction.style.display = 'none';
     }
     
     DOM.snackbar.classList.add('show');
-    setTimeout(() => this.hideSnackbar(), 4000); // Increased time for mobile reading
+    setTimeout(() => this.hideSnackbar(), 4000);
   },
 
   hideSnackbar() {
-    DOM.snackbar.classList.remove('show');
+    if (DOM.snackbar) {
+      DOM.snackbar.classList.remove('show');
+    }
   },
 
   createRevertButton() {
@@ -162,15 +197,21 @@ export const MediaControls = {
     StateManager.setMicEnabled(newState);
     audioTrack.enabled = newState;
     
-    // Force update button state
-    DOM.toggleMicBtn.classList.toggle('disabled', !newState);
-    DOM.micIcon.textContent = newState ? 'mic' : 'mic_off';
+    // Force update button state with safety checks
+    if (DOM.toggleMicBtn) {
+      DOM.toggleMicBtn.classList.toggle('disabled', !newState);
+    }
+    if (DOM.micIcon) {
+      DOM.micIcon.textContent = newState ? 'mic' : 'mic_off';
+    }
     
     // Force redraw on mobile
-    if ('ontouchstart' in window) {
+    if ('ontouchstart' in window && DOM.toggleMicBtn) {
       DOM.toggleMicBtn.style.transform = 'scale(0.95)';
       setTimeout(() => {
-        DOM.toggleMicBtn.style.transform = '';
+        if (DOM.toggleMicBtn) {
+          DOM.toggleMicBtn.style.transform = '';
+        }
       }, 100);
     }
 
@@ -197,15 +238,21 @@ export const MediaControls = {
     StateManager.setCamEnabled(newState);
     videoTrack.enabled = newState;
     
-    // Force update button state
-    DOM.toggleCamBtn.classList.toggle('disabled', !newState);
-    DOM.camIcon.textContent = newState ? 'videocam' : 'videocam_off';
+    // Force update button state with safety checks
+    if (DOM.toggleCamBtn) {
+      DOM.toggleCamBtn.classList.toggle('disabled', !newState);
+    }
+    if (DOM.camIcon) {
+      DOM.camIcon.textContent = newState ? 'videocam' : 'videocam_off';
+    }
     
     // Force redraw on mobile
-    if ('ontouchstart' in window) {
+    if ('ontouchstart' in window && DOM.toggleCamBtn) {
       DOM.toggleCamBtn.style.transform = 'scale(0.95)';
       setTimeout(() => {
-        DOM.toggleCamBtn.style.transform = '';
+        if (DOM.toggleCamBtn) {
+          DOM.toggleCamBtn.style.transform = '';
+        }
       }, 100);
     }
 
