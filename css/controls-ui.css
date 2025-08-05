@@ -64,6 +64,39 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  /* Mobile-specific improvements */
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+/* Mobile-specific button fixes */
+@media (pointer: coarse) {
+  .control-btn {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .control-btn * {
+    pointer-events: none !important;
+    touch-action: none !important;
+  }
+  
+  .control-btn:active {
+    transform: scale(0.95) !important;
+    transition: transform 0.1s ease !important;
+  }
+}
+
+/* Ensure icons don't interfere with touch events */
+.control-btn .material-symbols-outlined {
+  font-size: 24px;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .control-btn--standard {
@@ -104,10 +137,6 @@
 
 .control-btn:active {
   transform: scale(0.95);
-}
-
-.control-btn .material-symbols-outlined {
-  font-size: 24px;
 }
 
 .control-btn:focus-visible {

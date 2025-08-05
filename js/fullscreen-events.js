@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { AppState, DOM, StateManager } from './state.js';
-import { VideoMode, UI, MediaControls } from './ui-controls.js';
+import { VideoMode, UI, MediaControls, DebugFeedback } from './ui-controls.js';
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -165,43 +165,100 @@ export const EventManager = {
 
     const handlerId = Math.random().toString(36).substr(2, 9);
     let isProcessing = false;
+    let touchStarted = false;
 
     const safeHandler = (event) => {
       if (isProcessing) return;
       isProcessing = true;
       
       try {
-        event.preventDefault();
-        event.stopPropagation();
         handler();
       } catch (error) {
         console.error('Event handler error:', error);
       } finally {
-        setTimeout(() => { isProcessing = false; }, 100);
+        setTimeout(() => { isProcessing = false; }, 150);
       }
     };
 
-    // Use modern pointer events for better reliability
-    if ('PointerEvent' in window) {
-      element.addEventListener('pointerup', safeHandler, { passive: false, ...options });
+    // Mobile-first approach with better touch handling
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      // Mobile: Use touch events with proper handling
+      const handleTouchStart = (event) => {
+        touchStarted = true;
+        event.stopPropagation();
+      };
+
+      const handleTouchEnd = (event) => {
+        if (touchStarted) {
+          touchStarted = false;
+          event.preventDefault();
+          event.stopPropagation();
+          safeHandler(event);
+        }
+      };
+
+      const handleClick = (event) => {
+        // Prevent click if touch was handled
+        if (touchStarted) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        safeHandler(event);
+      };
+
+      element.addEventListener('touchstart', handleTouchStart, { passive: true });
+      element.addEventListener('touchend', handleTouchEnd, { passive: false });
+      element.addEventListener('click', handleClick, { passive: false });
+
+      // Store all handlers for cleanup
+      AppState.touchHandlers.set(handlerId, { 
+        element, 
+        handlers: { handleTouchStart, handleTouchEnd, handleClick }
+      });
     } else {
-      // Fallback for older browsers
-      element.addEventListener('click', safeHandler, { passive: false, ...options });
-      element.addEventListener('touchend', safeHandler, { passive: false, ...options });
+      // Desktop: Use pointer events or click
+      if ('PointerEvent' in window) {
+        const handlePointer = (event) => {
+          if (event.pointerType === 'touch') return; // Let touch events handle this
+          event.preventDefault();
+          event.stopPropagation();
+          safeHandler(event);
+        };
+        element.addEventListener('pointerup', handlePointer, { passive: false });
+        AppState.touchHandlers.set(handlerId, { element, handlers: { handlePointer } });
+      } else {
+        const handleClick = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          safeHandler(event);
+        };
+        element.addEventListener('click', handleClick, { passive: false });
+        AppState.touchHandlers.set(handlerId, { element, handlers: { handleClick } });
+      }
     }
 
-    // Store handler for cleanup
-    AppState.touchHandlers.set(handlerId, { element, handler: safeHandler });
     return handlerId;
   },
 
   removeEventListener(handlerId) {
     const handlerInfo = AppState.touchHandlers.get(handlerId);
     if (handlerInfo) {
-      const { element, handler } = handlerInfo;
-      element.removeEventListener('pointerup', handler);
-      element.removeEventListener('click', handler);
-      element.removeEventListener('touchend', handler);
+      const { element, handlers } = handlerInfo;
+      
+      // Remove all stored handlers
+      Object.entries(handlers).forEach(([eventType, handler]) => {
+        if (eventType === 'handleTouchStart') {
+          element.removeEventListener('touchstart', handler);
+        } else if (eventType === 'handleTouchEnd') {
+          element.removeEventListener('touchend', handler);
+        } else if (eventType === 'handlePointer') {
+          element.removeEventListener('pointerup', handler);
+        } else if (eventType === 'handleClick') {
+          element.removeEventListener('click', handler);
+        }
+      });
+      
       AppState.touchHandlers.delete(handlerId);
     }
   },
@@ -209,17 +266,66 @@ export const EventManager = {
   attachAllEventListeners() {
     if (AppState.eventHandlersAttached) return;
 
-    // Control buttons
-    this.attachEventListener(DOM.toggleMicBtn, () => MediaControls.toggleMicrophone());
-    this.attachEventListener(DOM.toggleCamBtn, () => MediaControls.toggleCamera());
-    this.attachEventListener(DOM.switchCameraBtn, () => MediaControls.switchCamera());
-    this.attachEventListener(DOM.toggleViewModeBtn, () => VideoMode.toggle());
-    this.attachEventListener(DOM.fullscreenBtn, () => FullscreenManager.toggleClutterFree());
-    this.attachEventListener(DOM.endCallBtn, () => window.endCall?.());
+    // Add CSS to prevent button interference on mobile
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      const style = document.createElement('style');
+      style.textContent = `
+        .control-btn {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none !important;
+          -webkit-user-select: none !important;
+          touch-action: manipulation !important;
+          pointer-events: auto !important;
+        }
+        .control-btn * {
+          pointer-events: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+      DebugFeedback.showDebug('Mobile touch optimization applied');
+    }
+
+    // Control buttons with specific mobile handling
+    this.attachEventListener(DOM.toggleMicBtn, () => {
+      DebugFeedback.showDebug('🎤 Mic button triggered');
+      MediaControls.toggleMicrophone();
+    });
+    
+    this.attachEventListener(DOM.toggleCamBtn, () => {
+      DebugFeedback.showDebug('📹 Camera button triggered');
+      MediaControls.toggleCamera();
+    });
+    
+    this.attachEventListener(DOM.switchCameraBtn, () => {
+      DebugFeedback.showDebug('🔄 Switch camera triggered');
+      MediaControls.switchCamera();
+    });
+    
+    this.attachEventListener(DOM.toggleViewModeBtn, () => {
+      DebugFeedback.showDebug('📺 View mode toggle triggered');
+      VideoMode.toggle();
+    });
+    
+    this.attachEventListener(DOM.fullscreenBtn, () => {
+      DebugFeedback.showDebug('🖥️ Fullscreen toggle triggered');
+      FullscreenManager.toggleClutterFree();
+    });
+    
+    this.attachEventListener(DOM.endCallBtn, () => {
+      UI.showSnackbar('📞 Ending call...');
+      window.endCall?.();
+    });
     
     // Video elements
-    this.attachEventListener(DOM.localVideoHalf, () => FullscreenManager.toggleLocalFullscreen());
-    this.attachEventListener(DOM.remoteVideoHalf, () => FullscreenManager.toggleRemoteFullscreen());
+    this.attachEventListener(DOM.localVideoHalf, () => {
+      DebugFeedback.showDebug('📱 Local video fullscreen toggled');
+      FullscreenManager.toggleLocalFullscreen();
+    });
+    
+    this.attachEventListener(DOM.remoteVideoHalf, () => {
+      DebugFeedback.showDebug('📱 Remote video fullscreen toggled');
+      FullscreenManager.toggleRemoteFullscreen();
+    });
     
     // Snackbar
     this.attachEventListener(DOM.snackbarAction, () => UI.hideSnackbar());
@@ -239,11 +345,22 @@ export const EventManager = {
     // Revert button (created dynamically)
     document.addEventListener('click', (event) => {
       if (event.target.closest('#revertBtn')) {
+        DebugFeedback.showDebug('⏪ Revert button triggered');
         FullscreenManager.toggleClutterFree();
       }
     });
 
+    // Prevent touch zoom on buttons only
+    document.addEventListener('touchstart', (event) => {
+      if (event.target.closest('.control-btn')) {
+        if (event.touches.length > 1) {
+          event.preventDefault();
+        }
+      }
+    }, { passive: false });
+
     AppState.eventHandlersAttached = true;
+    DebugFeedback.showSuccess('Event listeners attached successfully');
   },
 
   handleKeyboardShortcuts(event) {
