@@ -40,10 +40,17 @@
           </div>
         </div>
         
-        <button type="submit" class="welcome-btn" id="enterRoomBtn">
-          <span class="material-symbols-outlined">login</span>
-          <span>Enter Room</span>
-        </button>
+        <div class="button-group">
+          <button type="submit" class="welcome-btn welcome-btn--primary" id="enterRoomBtn">
+            <span class="material-symbols-outlined">login</span>
+            <span>Enter Room</span>
+          </button>
+          
+          <button type="button" class="welcome-btn welcome-btn--secondary" id="saveRoomBtn">
+            <span class="material-symbols-outlined">bookmark_add</span>
+            <span>Save Room</span>
+          </button>
+        </div>
         
         <div class="link-section" id="linkSection" style="display: none;">
           <div class="link-container">
@@ -53,6 +60,17 @@
             </button>
           </div>
           <p class="link-description">Share this link with others to join your room</p>
+        </div>
+        
+        <!-- Saved Rooms Section -->
+        <div class="saved-rooms-section" id="savedRoomsSection" style="display: none;">
+          <h3 class="saved-rooms-title">
+            <span class="material-symbols-outlined">bookmark</span>
+            Saved Rooms
+          </h3>
+          <div class="saved-rooms-list" id="savedRoomsList">
+            <!-- Saved rooms will be populated here -->
+          </div>
         </div>
       </form>
     </div>

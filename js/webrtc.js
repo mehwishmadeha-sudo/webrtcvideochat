@@ -292,7 +292,37 @@ export const WebRTC = {
       localStream.getTracks().forEach(track => track.stop());
     }
     
-    location.reload();
+    // Clear the room key from URL and return to welcome screen
+    window.history.pushState({}, '', window.location.pathname);
+    this.returnToWelcomeScreen();
+  },
+
+  returnToWelcomeScreen() {
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    const videoApp = document.getElementById('videoApp');
+    
+    if (welcomeScreen && videoApp) {
+      videoApp.style.display = 'none';
+      welcomeScreen.style.display = 'flex';
+      
+      // Clear form inputs
+      const sharedSecretInput = document.getElementById('sharedSecret');
+      const sharedMemoryInput = document.getElementById('sharedMemory');
+      
+      if (sharedSecretInput) sharedSecretInput.value = '';
+      if (sharedMemoryInput) sharedMemoryInput.value = '';
+      
+      // Hide link section
+      const linkSection = document.getElementById('linkSection');
+      if (linkSection) linkSection.style.display = 'none';
+      
+      // Trigger input events to update UI state
+      if (sharedSecretInput) sharedSecretInput.dispatchEvent(new Event('input'));
+      if (sharedMemoryInput) sharedMemoryInput.dispatchEvent(new Event('input'));
+    }
+    
+    // Reset global state
+    currentRoomKey = null;
   }
 };
 
