@@ -1,0 +1,208 @@
+/* =============================================================================
+   CONTROLS AND UI COMPONENTS
+   Control bar, buttons, snackbar, and UI elements
+   ============================================================================= */
+
+/* Control Bar */
+.control-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--md-surface);
+  border-top: 1px solid var(--md-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  box-shadow: var(--md-elevation-2);
+  z-index: 1001;
+  transition: all var(--md-duration-medium) var(--md-easing);
+}
+
+/* Connection Dot */
+.connection-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+  transition: background-color var(--md-duration-short) var(--md-easing);
+}
+
+.connection-dot.connected {
+  background-color: var(--md-success);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.connection-dot.disconnected {
+  background-color: var(--md-error);
+  box-shadow: 0 0 8px rgba(179, 38, 30, 0.4);
+}
+
+/* Control Buttons */
+.control-btn {
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: var(--md-corner-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--md-duration-short) var(--md-easing);
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(103, 80, 164, 0.2);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.control-btn--standard {
+  background: transparent;
+  color: var(--md-on-surface-variant);
+}
+
+.control-btn--standard:hover {
+  background: rgba(103, 80, 164, 0.08);
+}
+
+.control-btn--primary {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: var(--md-elevation-1);
+}
+
+.control-btn--primary:hover {
+  box-shadow: var(--md-elevation-2);
+  transform: scale(1.05);
+}
+
+.control-btn--primary.disabled {
+  background: var(--md-error);
+  color: var(--md-on-error);
+}
+
+.control-btn--error {
+  background: var(--md-error);
+  color: var(--md-on-error);
+  box-shadow: var(--md-elevation-1);
+}
+
+.control-btn--error:hover {
+  box-shadow: var(--md-elevation-2);
+  transform: scale(1.05);
+}
+
+.control-btn:active {
+  transform: scale(0.95);
+}
+
+.control-btn .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.control-btn:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+/* Revert Button */
+.revert-button {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: var(--md-corner-full);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--md-elevation-2);
+  z-index: 1002;
+  transition: all var(--md-duration-short) var(--md-easing);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(103, 80, 164, 0.2);
+}
+
+.revert-button:hover {
+  transform: scale(1.1);
+  box-shadow: var(--md-elevation-3);
+}
+
+.revert-button:active {
+  transform: scale(0.95);
+}
+
+.revert-button .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.revert-button:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+/* Snackbar */
+.snackbar {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--md-on-surface);
+  color: var(--md-surface);
+  padding: 12px 16px;
+  border-radius: var(--md-corner-small);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--md-elevation-2);
+  opacity: 0;
+  transition: all var(--md-duration-medium) var(--md-easing);
+  z-index: 1003;
+  max-width: calc(100vw - 32px);
+}
+
+.snackbar.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.snackbar-text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.snackbar-action {
+  background: none;
+  border: none;
+  color: var(--md-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--md-corner-small);
+  transition: background var(--md-duration-short) var(--md-easing);
+}
+
+.snackbar-action:hover {
+  background: rgba(103, 80, 164, 0.08);
+}
+
+/* Clutter-free mode adjustments */
+.video-app.clutter-free .snackbar {
+  bottom: 20px;
+} 

@@ -8,11 +8,12 @@ A modern, minimal video calling web application built with WebRTC and Material 3
 - **📱 Responsive Layout**: Optimized for both mobile and desktop
 - **🔄 WebRTC Video Calling**: Peer-to-peer video communication
 - **🔥 Firebase Signaling**: Real-time signaling via Firebase Realtime Database
-- **🎛️ Intuitive Controls**: Mic, camera, fullscreen, and camera switching
+- **🎛️ Intuitive Controls**: Mic, camera, fullscreen, and camera switching with improved reliability
 - **📺 Dual View Modes**: Split-screen and individual fullscreen views
 - **🔄 Aspect Ratio Control**: Toggle between fit (preserve aspect ratio) and fill (crop to fill) modes
 - **🖥️ Clutter-Free Mode**: Hide controls and enter full browser fullscreen (like F11) for immersive experience
 - **⌨️ Keyboard Shortcuts**: Quick access to all functions
+- **🛠️ Enhanced Reliability**: Professional event handling and state management for bug-free operation
 
 ## 🚀 Live Demo
 

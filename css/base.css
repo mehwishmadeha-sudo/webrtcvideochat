@@ -1,0 +1,109 @@
+/* =============================================================================
+   BASE STYLES
+   Material 3 design tokens, reset, and foundation styles
+   ============================================================================= */
+
+/* Material 3 Design Tokens */
+:root {
+  /* Colors */
+  --md-primary: #6750A4;
+  --md-on-primary: #FFFFFF;
+  --md-error: #B3261E;
+  --md-on-error: #FFFFFF;
+  --md-surface: #FEF7FF;
+  --md-on-surface: #1C1B1F;
+  --md-surface-variant: #E7E0EC;
+  --md-on-surface-variant: #49454F;
+  --md-outline: #79747E;
+  --md-outline-variant: #CAC4D0;
+  --md-success: #4CAF50;
+  
+  /* Elevation */
+  --md-elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.3), 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
+  
+  /* Shape */
+  --md-corner-small: 8px;
+  --md-corner-medium: 12px;
+  --md-corner-large: 16px;
+  --md-corner-full: 50%;
+  
+  /* Motion */
+  --md-duration-short: 200ms;
+  --md-duration-medium: 300ms;
+  --md-easing: cubic-bezier(0.2, 0.0, 0, 1.0);
+}
+
+/* Base Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--md-surface);
+  color: var(--md-on-surface);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Disable zoom and scroll */
+body {
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+/* Fullscreen optimizations */
+:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-moz-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Ensure video app takes full space in browser fullscreen */
+:fullscreen .video-app,
+:-webkit-full-screen .video-app,
+:-moz-full-screen .video-app,
+:-ms-fullscreen .video-app {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Accessibility - Focus States */
+*:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+} 

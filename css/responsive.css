@@ -1,0 +1,205 @@
+/* =============================================================================
+   RESPONSIVE DESIGN
+   Media queries and responsive adjustments
+   ============================================================================= */
+
+/* Mobile Specific Adjustments */
+@media (max-width: 480px) {
+  .control-bar {
+    height: 56px;
+    gap: 4px;
+    padding: 0 8px;
+  }
+  
+  .control-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    -webkit-tap-highlight-color: rgba(103, 80, 164, 0.3);
+    tap-highlight-color: rgba(103, 80, 164, 0.3);
+  }
+  
+  .control-btn .material-symbols-outlined {
+    font-size: 22px;
+  }
+  
+  .video-half {
+    height: calc((100vh - 56px) / 2);
+  }
+  
+  .video-half--fullscreen {
+    height: 100vh !important;
+  }
+  
+  .video-app.clutter-free .video-half {
+    height: 50vh !important;
+  }
+  
+  .video-app.clutter-free .video-half--fullscreen {
+    height: 100vh !important;
+  }
+  
+  .snackbar {
+    bottom: 72px;
+    margin: 0 16px;
+    max-width: calc(100vw - 32px);
+  }
+  
+  .connection-dot {
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+  }
+  
+  .revert-button {
+    width: 40px;
+    height: 40px;
+    bottom: 12px;
+    right: 12px;
+  }
+  
+  .revert-button .material-symbols-outlined {
+    font-size: 20px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 360px) {
+  .control-bar {
+    gap: 2px;
+    padding: 0 4px;
+  }
+  
+  .control-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .control-btn .material-symbols-outlined {
+    font-size: 20px;
+  }
+  
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+  }
+  
+  .revert-button {
+    width: 36px;
+    height: 36px;
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .revert-button .material-symbols-outlined {
+    font-size: 18px;
+  }
+}
+
+/* Large Desktop */
+@media (min-width: 1200px) {
+  .control-bar {
+    gap: 12px;
+  }
+  
+  .control-btn {
+    width: 52px;
+    height: 52px;
+  }
+  
+  .control-btn .material-symbols-outlined {
+    font-size: 26px;
+  }
+  
+  .connection-dot {
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+  }
+  
+  .revert-button {
+    width: 52px;
+    height: 52px;
+    bottom: 20px;
+    right: 20px;
+  }
+  
+  .revert-button .material-symbols-outlined {
+    font-size: 26px;
+  }
+}
+
+/* Landscape Mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .control-bar {
+    height: 48px;
+  }
+  
+  .control-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .control-btn .material-symbols-outlined {
+    font-size: 20px;
+  }
+  
+  .video-half {
+    height: calc(100vh - 48px);
+  }
+  
+  .video-half--fullscreen {
+    height: 100vh !important;
+  }
+  
+  .video-app.clutter-free .video-half {
+    height: 100vh !important;
+  }
+  
+  .video-app.clutter-free .video-half--fullscreen {
+    height: 100vh !important;
+  }
+  
+  .snackbar {
+    bottom: 64px;
+  }
+  
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+  }
+  
+  .revert-button {
+    width: 36px;
+    height: 36px;
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .revert-button .material-symbols-outlined {
+    font-size: 18px;
+  }
+}
+
+/* High Contrast */
+@media (prefers-contrast: high) {
+  .video-half--remote {
+    border-bottom: 2px solid var(--md-outline);
+    border-right: 2px solid var(--md-outline);
+  }
+  
+  .control-btn--standard {
+    border: 1px solid var(--md-outline);
+  }
+  
+  .connection-dot {
+    border: 2px solid var(--md-on-surface);
+  }
+  
+  .revert-button {
+    border: 2px solid var(--md-on-primary);
+  }
+} 
