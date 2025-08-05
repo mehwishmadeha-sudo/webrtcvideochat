@@ -41,7 +41,7 @@
   box-shadow: 0 0 8px rgba(179, 38, 30, 0.4);
 }
 
-/* Control Buttons */
+/* Control Buttons - Enhanced for outline icons */
 .control-btn {
   width: 48px;
   height: 48px;
@@ -53,7 +53,7 @@
   cursor: pointer;
   transition: all var(--md-duration-short) var(--md-easing);
   position: relative;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to allow better touch detection */
   touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(103, 80, 164, 0.2);
   -webkit-appearance: none;
@@ -69,51 +69,70 @@
   isolation: isolate;
 }
 
-/* Mobile-specific button fixes - Enhanced */
-@media (pointer: coarse), (max-width: 768px) {
-  .control-btn {
-    -webkit-tap-highlight-color: transparent !important;
-    -webkit-touch-callout: none !important;
-    -webkit-user-select: none !important;
-    touch-action: manipulation !important;
-    pointer-events: auto !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
-    /* Prevent any interference */
-    position: relative !important;
-    z-index: 10 !important;
-    isolation: isolate !important;
-  }
-  
-  /* Ensure child elements don't interfere */
-  .control-btn * {
-    pointer-events: none !important;
-    touch-action: none !important;
-    -webkit-touch-callout: none !important;
-    -webkit-user-select: none !important;
-    user-select: none !important;
-  }
-  
-  /* Force active state on touch */
-  .control-btn:active {
-    transform: scale(0.9) !important;
-    transition: transform 0.1s ease !important;
-  }
-  
-  /* Critical buttons get extra protection */
-  #toggleMic, #toggleCam {
-    touch-action: manipulation !important;
-    pointer-events: auto !important;
-    z-index: 100 !important;
-  }
-}
-
-/* Ensure icons don't interfere with touch events */
+/* Ensure icons fill the entire button area for better touch */
 .control-btn .material-symbols-outlined {
   font-size: 24px;
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
+  /* Fill the entire button area */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Ensure outline icons have good visibility */
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* Enhanced mobile touch targets */
+@media (pointer: coarse), (max-width: 768px) {
+  .control-btn {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    /* Add padding for larger touch area */
+    padding: 4px !important;
+    /* Ensure touch area extends beyond visual boundary */
+    margin: 2px !important;
+    position: relative !important;
+    z-index: 10 !important;
+    isolation: isolate !important;
+    /* Remove overflow hidden for better touch detection */
+    overflow: visible !important;
+  }
+  
+  /* Make icons more touch-friendly */
+  .control-btn .material-symbols-outlined {
+    font-size: 26px !important;
+    font-weight: 400 !important;
+    /* Ensure full coverage of button */
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  /* Critical buttons get extra protection and larger touch area */
+  #toggleMic, #toggleCam, #endCallBtn {
+    min-width: 52px !important;
+    min-height: 52px !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    z-index: 100 !important;
+    /* Add pseudo-element for extended touch area */
+  }
+  
+  /* Extended touch area using pseudo-element */
+  #toggleMic::before, #toggleCam::before, #endCallBtn::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    right: -8px;
+    bottom: -8px;
+    background: transparent;
+    pointer-events: auto;
+    z-index: -1;
+  }
 }
 
 .control-btn--standard {

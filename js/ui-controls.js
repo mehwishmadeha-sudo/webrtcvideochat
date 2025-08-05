@@ -202,7 +202,8 @@ export const MediaControls = {
       DOM.toggleMicBtn.classList.toggle('disabled', !newState);
     }
     if (DOM.micIcon) {
-      DOM.micIcon.textContent = newState ? 'mic' : 'mic_off';
+      // Use outline icons: mic_none (enabled) and mic_off (disabled)
+      DOM.micIcon.textContent = newState ? 'mic_none' : 'mic_off';
     }
     
     // Force redraw on mobile
@@ -243,6 +244,7 @@ export const MediaControls = {
       DOM.toggleCamBtn.classList.toggle('disabled', !newState);
     }
     if (DOM.camIcon) {
+      // Use outline icons: videocam (enabled) and videocam_off (disabled)
       DOM.camIcon.textContent = newState ? 'videocam' : 'videocam_off';
     }
     
@@ -350,38 +352,90 @@ export const MobileTesting = {
     }
 
     const buttons = [
-      { element: DOM.toggleMicBtn, name: 'Microphone' },
-      { element: DOM.toggleCamBtn, name: 'Camera' },
-      { element: DOM.switchCameraBtn, name: 'Switch Camera' }
+      { element: DOM.toggleMicBtn, name: 'Microphone', expectedIcon: 'mic_none' },
+      { element: DOM.toggleCamBtn, name: 'Camera', expectedIcon: 'videocam' },
+      { element: DOM.endCallBtn, name: 'End Call', expectedIcon: 'call_end' }
     ];
 
-    buttons.forEach(({ element, name }) => {
+    buttons.forEach(({ element, name, expectedIcon }) => {
       if (element) {
-        // Force a visible test on the button
-        element.style.border = '2px solid lime';
-        element.addEventListener('touchend', () => {
+        // Add visual touch area indicator
+        element.style.position = 'relative';
+        element.style.border = '2px dashed lime';
+        element.style.boxShadow = '0 0 0 8px rgba(0, 255, 0, 0.2)';
+        
+        // Add extended touch area visualization
+        const touchArea = document.createElement('div');
+        touchArea.style.cssText = `
+          position: absolute;
+          top: -12px;
+          left: -12px;
+          right: -12px;
+          bottom: -12px;
+          border: 1px dotted yellow;
+          background: rgba(255, 255, 0, 0.1);
+          pointer-events: none;
+          z-index: -1;
+        `;
+        element.appendChild(touchArea);
+        
+        // Test touch responsiveness
+        element.addEventListener('touchend', (e) => {
+          e.preventDefault();
           element.style.background = 'lime';
-          UI.showSnackbar(`✅ ${name} button is responsive!`);
+          element.style.transform = 'scale(1.1)';
+          
+          const icon = element.querySelector('.material-symbols-outlined');
+          UI.showSnackbar(`✅ ${name} responsive! Icon: ${icon?.textContent}`);
+          
           setTimeout(() => {
             element.style.background = '';
-            element.style.border = '';
+            element.style.transform = '';
           }, 1000);
         }, { passive: false });
-        console.log(`${name} button test handler added`);
+        
+        // Test regular functionality
+        element.addEventListener('touchstart', (e) => {
+          element.style.transform = 'scale(0.9)';
+        }, { passive: true });
+        
+        console.log(`${name} button test setup - expected icon: ${expectedIcon}`);
       } else {
         console.error(`${name} button not found`);
       }
     });
 
-    UI.showSnackbar('🧪 Mobile button test mode enabled - tap buttons to test');
+    UI.showSnackbar('🧪 Touch area test mode - lime borders show touch zones');
+  },
+
+  removeTestMode() {
+    const buttons = [DOM.toggleMicBtn, DOM.toggleCamBtn, DOM.endCallBtn];
+    buttons.forEach(button => {
+      if (button) {
+        button.style.border = '';
+        button.style.boxShadow = '';
+        button.style.background = '';
+        button.style.transform = '';
+        // Remove test touch area
+        const touchArea = button.querySelector('div');
+        if (touchArea) touchArea.remove();
+      }
+    });
+    UI.showSnackbar('🧪 Test mode disabled');
   }
 };
 
-// Auto-run test on mobile
-if ('ontouchstart' in window && DOM.isReady()) {
+// Auto-run test on mobile with delay for DOM readiness
+if ('ontouchstart' in window) {
   setTimeout(() => {
-    MobileTesting.testButtons();
-  }, 2000);
+    if (DOM.isReady()) {
+      MobileTesting.testButtons();
+      // Auto-remove test mode after 10 seconds
+      setTimeout(() => {
+        MobileTesting.removeTestMode();
+      }, 10000);
+    }
+  }, 3000);
 }
 
 // Export DebugFeedback for use in other modules
