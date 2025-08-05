@@ -2,7 +2,7 @@
 import { DOM } from './js/state.js';
 import { VideoMode, UI } from './js/ui-controls.js';
 import { EventManager } from './js/fullscreen-events.js';
-import { WebRTC } from './js/webrtc.js';
+import { WelcomeController } from './js/welcome-controller.js';
 
 // =============================================================================
 // MAIN APPLICATION - CLEAN AND SIMPLE
@@ -54,14 +54,14 @@ const App = {
 
       VideoMode.initialize();
       EventManager.attachAllEventListeners();
-      await WebRTC.initializeMedia();
+      
+      // Initialize welcome controller instead of WebRTC directly
+      WelcomeController.init();
       
       // Update status bar to show successful load
       updateStatusBar();
       
     } catch (error) {
-      console.error('App initialization failed:', error);
-      
       if (DOM.isReady()) {
         UI.showSnackbar('App initialization failed', 'Retry', () => this.initialize());
       } else {

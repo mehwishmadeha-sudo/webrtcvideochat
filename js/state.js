@@ -51,7 +51,6 @@ export const DOM = {
     try {
       // Wait for DOM to be ready
       if (document.readyState === 'loading') {
-        console.log('DOM not ready yet, waiting...');
         return false;
       }
 
@@ -82,15 +81,12 @@ export const DOM = {
       const missingElements = criticalElements.filter(elementName => !this[elementName]);
       
       if (missingElements.length > 0) {
-        console.error('Missing critical DOM elements:', missingElements);
         return false;
       }
 
       this.initialized = true;
-      console.log('DOM elements successfully initialized');
       return true;
     } catch (error) {
-      console.error('DOM initialization failed:', error);
       return false;
     }
   },

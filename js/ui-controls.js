@@ -206,7 +206,7 @@ export const MediaControls = {
       VideoMode.apply(DOM.localVideo);
       
     } catch (error) {
-      console.error('Camera switch failed:', error);
+      UI.showSnackbar('Camera switch failed');
     }
   }
 }; 

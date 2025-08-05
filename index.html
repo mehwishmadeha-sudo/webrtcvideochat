@@ -16,13 +16,55 @@
   <script type="module" defer src="app.js"></script>
 </head>
 <body>
+  <!-- Welcome Screen -->
+  <div class="welcome-screen" id="welcomeScreen">
+    <div class="welcome-container">
+      <div class="welcome-header">
+        <span class="material-symbols-outlined welcome-icon">videocam</span>
+        <h1 class="welcome-title">Video Call</h1>
+        <p class="welcome-subtitle">Enter your room credentials to start or join a secure video call</p>
+      </div>
+      
+      <form class="welcome-form" id="welcomeForm">
+        <div class="input-group">
+          <div class="input-field">
+            <input type="text" id="sharedSecret" class="input-text" placeholder=" " required>
+            <label for="sharedSecret" class="input-label">Shared Secret</label>
+            <div class="input-outline"></div>
+          </div>
+          
+          <div class="input-field">
+            <input type="text" id="sharedMemory" class="input-text" placeholder=" " required>
+            <label for="sharedMemory" class="input-label">Shared Memory</label>
+            <div class="input-outline"></div>
+          </div>
+        </div>
+        
+        <button type="submit" class="welcome-btn" id="enterRoomBtn">
+          <span class="material-symbols-outlined">login</span>
+          <span>Enter Room</span>
+        </button>
+        
+        <div class="link-section" id="linkSection" style="display: none;">
+          <div class="link-container">
+            <div class="link-text" id="shareableLink">Creating link...</div>
+            <button type="button" class="copy-btn" id="copyLinkBtn" title="Copy link">
+              <span class="material-symbols-outlined">content_copy</span>
+            </button>
+          </div>
+          <p class="link-description">Share this link with others to join your room</p>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Update Status Bar -->
-  <div class="update-status-bar">
+  <div class="update-status-bar" style="display: none;" id="statusBar">
     <span>✅ Page Updated: December 2024 - Clean Independent Buttons Version</span>
   </div>
 
   <!-- Main Video Container -->
-  <main class="video-app">
+  <main class="video-app" id="videoApp" style="display: none;">
     <!-- Remote Video (Top Half / Left Half) -->
     <div class="video-half video-half--remote" id="remoteVideoHalf">
       <video id="remoteVideo" autoplay playsinline class="video-element"></video>

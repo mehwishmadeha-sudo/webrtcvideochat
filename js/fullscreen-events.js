@@ -33,7 +33,6 @@ export const Utils = {
       }
       return true;
     } catch (error) {
-      console.error('Fullscreen request failed:', error);
       return false;
     }
   },
@@ -51,7 +50,6 @@ export const Utils = {
       }
       return true;
     } catch (error) {
-      console.error('Exit fullscreen failed:', error);
       return false;
     }
   }

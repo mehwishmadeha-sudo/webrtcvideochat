@@ -1,19 +1,29 @@
 // =============================================================================
-// WEBRTC MODULE
-// WebRTC connection and signaling management
+// WEBRTC MODULE - NEW CONNECTION LOGIC
+// WebRTC connection management with room-based signaling
 // =============================================================================
 
-import { db, ref, onValue, set, remove } from '../firebase-config.js';
+import { db, ref, onValue, set, remove, onDisconnect } from '../firebase-config.js';
 import { DOM, StateManager } from './state.js';
 import { VideoMode, UI } from './ui-controls.js';
 
 // =============================================================================
+// GLOBAL STATE
+// =============================================================================
+let currentRoomKey = null;
+let offerListener = null;
+let answerListener = null;
+let disconnectCleanup = null;
+
+// =============================================================================
 // FIREBASE REFERENCES
 // =============================================================================
-export const FirebaseRefs = {
-  offer: ref(db, "offer"),
-  answer: ref(db, "answer")
-};
+function getRoomRefs(roomKey) {
+  return {
+    offer: ref(db, `rooms/${roomKey}/offer`),
+    answer: ref(db, `rooms/${roomKey}/answer`)
+  };
+}
 
 // =============================================================================
 // WEBRTC SETUP
@@ -23,7 +33,21 @@ export const peerConnection = new RTCPeerConnection({
 });
 
 // =============================================================================
-// WEBRTC AND SIGNALING
+// ROOM KEY GENERATION
+// =============================================================================
+export function generateRoomKey(sharedSecret, sharedMemory) {
+  // Create room key as: sharedSecret-sharedMemory
+  return `${sharedSecret.trim()}-${sharedMemory.trim()}`;
+}
+
+export function generateShareableLink(roomKey) {
+  const baseUrl = window.location.origin + window.location.pathname;
+  const encodedRoomKey = encodeURIComponent(roomKey);
+  return `${baseUrl}?room=${encodedRoomKey}`;
+}
+
+// =============================================================================
+// WEBRTC CORE FUNCTIONS
 // =============================================================================
 export const WebRTC = {
   async initializeMedia() {
@@ -50,64 +74,130 @@ export const WebRTC = {
       localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
       });
-
-      this.startSignaling();
       
     } catch (error) {
-      console.error('Media error:', error);
       UI.showSnackbar('Camera/microphone access failed', 'Retry', () => this.initializeMedia());
+      throw error;
     }
   },
 
-  async startSignaling() {
-    console.log('Starting signaling...');
+  async startConnection(roomKey) {
+    currentRoomKey = roomKey;
+    const roomRefs = getRoomRefs(roomKey);
     
-    const offerSnapshot = await new Promise(resolve => {
-      onValue(FirebaseRefs.offer, resolve, { onlyOnce: true });
-    });
-    const answerSnapshot = await new Promise(resolve => {
-      onValue(FirebaseRefs.answer, resolve, { onlyOnce: true });
-    });
+    // Clean up any existing listeners
+    this.cleanup();
+    
+    // Read current state
+    const [offerSnapshot, answerSnapshot] = await Promise.all([
+      new Promise(resolve => onValue(roomRefs.offer, resolve, { onlyOnce: true })),
+      new Promise(resolve => onValue(roomRefs.answer, resolve, { onlyOnce: true }))
+    ]);
     
     const offer = offerSnapshot.val();
     const answer = answerSnapshot.val();
     
     if (offer == null && answer == null) {
-      console.log('Creating offer...');
-      const myOffer = await this.createOffer();
-      await set(FirebaseRefs.offer, { sdp: myOffer.sdp, type: myOffer.type });
-      
-      onValue(FirebaseRefs.answer, async (snapshot) => {
-        const answerData = snapshot.val();
-        if (answerData) {
-          await this.connectToPeer(answerData);
-        }
-      });
+      // SCENARIO 1: Fresh start
+      await this.scenario1_FreshStart(roomRefs);
     } else if (offer != null && answer == null) {
-      console.log('Creating answer...');
-      const myAnswer = await this.createAnswer(offer);
-      await set(FirebaseRefs.answer, { sdp: myAnswer.sdp, type: myAnswer.type });
+      // SCENARIO 2: Second peer joins
+      await this.scenario2_SecondPeerJoins(roomRefs, offer);
     } else if (offer != null && answer != null) {
-      console.log('Cleaning up stale session...');
-      await remove(FirebaseRefs.offer);
-      await remove(FirebaseRefs.answer);
-      
-      const myOffer = await this.createOffer();
-      await set(FirebaseRefs.offer, { sdp: myOffer.sdp, type: myOffer.type });
-      
-      onValue(FirebaseRefs.answer, async (snapshot) => {
-        const answerData = snapshot.val();
-        if (answerData) {
-          await this.connectToPeer(answerData);
-        }
-      });
+      // SCENARIO 3: Invalid/stale state
+      await this.scenario3_CleanupAndRestart(roomRefs);
     }
+  },
+
+  async scenario1_FreshStart(roomRefs) {
+    // Create offer
+    const offer = await this.createOffer();
+    await set(roomRefs.offer, { sdp: offer.sdp, type: offer.type });
+    
+    // Set up disconnect cleanup
+    disconnectCleanup = onDisconnect(roomRefs.offer);
+    await disconnectCleanup.remove();
+    
+    // Listen for answer
+    answerListener = onValue(roomRefs.answer, async (snapshot) => {
+      const answerData = snapshot.val();
+      if (answerData) {
+        try {
+          await this.connectToPeer(answerData);
+          // On success: remove offer and answer, then listen for reconnects
+          await Promise.all([
+            remove(roomRefs.offer),
+            remove(roomRefs.answer)
+          ]);
+          this.handleReconnect(roomRefs);
+        } catch (error) {
+          UI.showSnackbar('Connection failed', 'Retry', () => this.startConnection(currentRoomKey));
+        }
+      }
+    });
+  },
+
+  async scenario2_SecondPeerJoins(roomRefs, offer) {
+    // Create answer
+    const answer = await this.createAnswer(offer);
+    await set(roomRefs.answer, { sdp: answer.sdp, type: answer.type });
+    
+    try {
+      await this.connectToPeer(offer);
+      // On success: listen for reconnects
+      this.handleReconnect(roomRefs);
+    } catch (error) {
+      UI.showSnackbar('Connection failed', 'Retry', () => this.startConnection(currentRoomKey));
+    }
+  },
+
+  async scenario3_CleanupAndRestart(roomRefs) {
+    // Remove stale data
+    await Promise.all([
+      remove(roomRefs.offer),
+      remove(roomRefs.answer)
+    ]);
+    
+    // Restart from scenario 1
+    await this.scenario1_FreshStart(roomRefs);
+  },
+
+  handleReconnect(roomRefs) {
+    // Clean up existing listeners
+    if (offerListener) offerListener();
+    if (answerListener) answerListener();
+    
+    // Listen for new offers (reconnection attempts)
+    offerListener = onValue(roomRefs.offer, async (snapshot) => {
+      const offerData = snapshot.val();
+      if (offerData) {
+        try {
+          // Create answer for the new offer
+          const answer = await this.createAnswer(offerData);
+          await set(roomRefs.answer, { sdp: answer.sdp, type: answer.type });
+          
+          await this.connectToPeer(offerData);
+          
+          // On success: remove offer and answer, then listen again
+          await Promise.all([
+            remove(roomRefs.offer),
+            remove(roomRefs.answer)
+          ]);
+          
+          // Recursive reconnect handling
+          this.handleReconnect(roomRefs);
+        } catch (error) {
+          UI.showSnackbar('Reconnection failed', 'Retry', () => this.startConnection(currentRoomKey));
+        }
+      }
+    });
   },
 
   async createOffer() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     
+    // Wait for ICE gathering to complete
     if (peerConnection.iceGatheringState !== 'complete') {
       await new Promise(resolve => {
         peerConnection.addEventListener('icegatheringstatechange', () => {
@@ -126,6 +216,7 @@ export const WebRTC = {
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     
+    // Wait for ICE gathering to complete
     if (peerConnection.iceGatheringState !== 'complete') {
       await new Promise(resolve => {
         peerConnection.addEventListener('icegatheringstatechange', () => {
@@ -139,8 +230,28 @@ export const WebRTC = {
     return peerConnection.localDescription;
   },
 
-  async connectToPeer(answer) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+  async connectToPeer(sessionDescription) {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(sessionDescription));
+    
+    // Wait for connection to be established
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, 10000);
+      
+      const checkConnection = () => {
+        if (peerConnection.connectionState === 'connected') {
+          clearTimeout(timeout);
+          resolve();
+        } else if (peerConnection.connectionState === 'failed') {
+          clearTimeout(timeout);
+          reject(new Error('Connection failed'));
+        }
+      };
+      
+      peerConnection.addEventListener('connectionstatechange', checkConnection);
+      checkConnection(); // Check immediately in case already connected
+    });
   },
 
   async updateVideoTrack(newVideoTrack) {
@@ -150,14 +261,37 @@ export const WebRTC = {
     }
   },
 
+  cleanup() {
+    // Clean up listeners
+    if (offerListener) {
+      offerListener();
+      offerListener = null;
+    }
+    if (answerListener) {
+      answerListener();
+      answerListener = null;
+    }
+    if (disconnectCleanup) {
+      disconnectCleanup.cancel();
+      disconnectCleanup = null;
+    }
+  },
+
   endCall() {
+    this.cleanup();
+    
+    if (currentRoomKey) {
+      const roomRefs = getRoomRefs(currentRoomKey);
+      remove(roomRefs.offer);
+      remove(roomRefs.answer);
+    }
+    
     peerConnection.close();
     const localStream = StateManager.getLocalStream();
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
-    remove(FirebaseRefs.offer);
-    remove(FirebaseRefs.answer);
+    
     location.reload();
   }
 };
@@ -174,23 +308,14 @@ peerConnection.onconnectionstatechange = () => {
   const state = peerConnection.connectionState;
   StateManager.setConnected(state === 'connected');
   UI.updateConnectionDot();
-  
-  if (StateManager.isConnected()) {
-    console.log('Connected!');
-  }
 };
 
 peerConnection.onicecandidate = (event) => {
-  if (event.candidate) {
-    console.log('ICE candidate:', event.candidate.type);
-  }
+  // ICE candidates are automatically included in the SDP after gathering completes
 };
 
 peerConnection.onicegatheringstatechange = () => {
-  const state = peerConnection.iceGatheringState;
-  if (state === 'complete') {
-    console.log('ICE gathering complete');
-  }
+  // Handle ICE gathering state changes if needed
 };
 
 // Make functions available globally for module communication
